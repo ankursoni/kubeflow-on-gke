@@ -97,7 +97,6 @@ terraform destroy -var-file="values-secret.tfvars"
 ## Install Kubeflow v1
 Installation:
 - https://www.kubeflow.org/docs/components/pipelines/v1/installation/standalone-deployment/
-- https://www.kubeflow.org/docs/components/pipelines/v1/sdk/install-sdk/
 ```shell
 export PIPELINE_VERSION=1.8.5
 kubectl apply -k "github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref=$PIPELINE_VERSION"
@@ -147,3 +146,5 @@ export PIPELINE_VERSION=1.8.5
 kubectl delete -k "github.com/kubeflow/pipelines/manifests/kustomize/env/dev?ref=$PIPELINE_VERSION"
 kubectl delete -k "github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref=$PIPELINE_VERSION"
 ```
+
+Now, check [pipelines/hello_world/README](../../pipelines/hello_world/README.md)

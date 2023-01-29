@@ -1,0 +1,69 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: hello-world-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18, pipelines.kubeflow.org/pipeline_compilation_time: '2023-01-30T05:58:31.485192',
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "Hello world pipeline",
+      "inputs": [{"name": "user_name"}], "name": "Hello world pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18}
+spec:
+  entrypoint: hello-world-pipeline
+  templates:
+  - name: hello-world-pipeline
+    inputs:
+      parameters:
+      - {name: user_name}
+    dag:
+      tasks:
+      - name: say-hello
+        template: say-hello
+        arguments:
+          parameters:
+          - {name: user_name, value: '{{inputs.parameters.user_name}}'}
+  - name: say-hello
+    container:
+      args: [--user-name, '{{inputs.parameters.user_name}}']
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def say_hello(user_name):
+            """Function to say hello."""
+            print(f"Hello {user_name}, Welcome!")
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Say hello', description='Function to say hello.')
+        _parser.add_argument("--user-name", dest="user_name", type=str, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = say_hello(**_parsed_args)
+      image: python:3.11.1-slim-buster
+    inputs:
+      parameters:
+      - {name: user_name}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.18
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "false"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Function
+          to say hello.", "implementation": {"container": {"args": ["--user-name",
+          {"inputValue": "user_name"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def say_hello(user_name):\n    \"\"\"Function to say hello.\"\"\"\n    print(f\"Hello
+          {user_name}, Welcome!\")\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Say
+          hello'', description=''Function to say hello.'')\n_parser.add_argument(\"--user-name\",
+          dest=\"user_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          = vars(_parser.parse_args())\n\n_outputs = say_hello(**_parsed_args)\n"],
+          "image": "python:3.11.1-slim-buster"}}, "inputs": [{"name": "user_name",
+          "type": "String"}], "name": "Say hello"}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"user_name": "{{inputs.parameters.user_name}}"}',
+        pipelines.kubeflow.org/max_cache_staleness: P0D}
+  arguments:
+    parameters:
+    - {name: user_name}
+  serviceAccountName: pipeline-runner
