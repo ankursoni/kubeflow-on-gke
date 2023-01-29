@@ -1,0 +1,11 @@
+project_id="<PROJECT ID>"
+region="europe-west4"
+zone="europe-west4-a"
+prefix="kubeflow"
+environment="prototype"
+machine_type_pool01="e2-medium"
+node_count_pool01=1
+machine_type_pool02="t2a-standard-1"
+node_count_pool02=1
+machine_type_pool03="t2a-standard-1"
+node_count_pool03=1
