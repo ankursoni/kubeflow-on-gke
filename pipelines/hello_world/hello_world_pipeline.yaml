@@ -2,19 +2,111 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: hello-world-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18, pipelines.kubeflow.org/pipeline_compilation_time: '2023-01-30T05:58:31.485192',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18, pipelines.kubeflow.org/pipeline_compilation_time: '2023-02-06T06:13:20.759900',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Hello world pipeline",
-      "inputs": [{"name": "user_name"}], "name": "Hello world pipeline"}'}
+      "inputs": [{"name": "user_name"}, {"name": "gcs_bucket_name"}, {"name": "file_name"}],
+      "name": "Hello world pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18}
 spec:
   entrypoint: hello-world-pipeline
   templates:
+  - name: download-file-from-gcs-bucket
+    container:
+      args: [--gcs-bucket-name, '{{inputs.parameters.gcs_bucket_name}}', --file-name,
+        '{{inputs.parameters.file_name}}', --downloaded, /tmp/outputs/downloaded/data]
+      command:
+      - sh
+      - -c
+      - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+        'google-cloud-storage~=2.7.0' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m
+        pip install --quiet --no-warn-script-location 'google-cloud-storage~=2.7.0'
+        --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def download_file_from_gcs_bucket(
+            gcs_bucket_name, file_name, downloaded_path
+        ):
+            """Function to download data from gcs bucket."""
+            from google.cloud import storage
+
+            client = storage.Client()
+            bucket = client.bucket(gcs_bucket_name)
+            blob = bucket.blob(file_name)
+            blob.download_to_filename(downloaded_path)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Download file from gcs bucket', description='Function to download data from gcs bucket.')
+        _parser.add_argument("--gcs-bucket-name", dest="gcs_bucket_name", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--file-name", dest="file_name", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--downloaded", dest="downloaded_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = download_file_from_gcs_bucket(**_parsed_args)
+      image: python:3.10.8-buster
+      imagePullPolicy: Always
+    inputs:
+      parameters:
+      - {name: file_name}
+      - {name: gcs_bucket_name}
+    outputs:
+      artifacts:
+      - {name: download-file-from-gcs-bucket-downloaded, path: /tmp/outputs/downloaded/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.18
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "false"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Function
+          to download data from gcs bucket.", "implementation": {"container": {"args":
+          ["--gcs-bucket-name", {"inputValue": "gcs_bucket_name"}, "--file-name",
+          {"inputValue": "file_name"}, "--downloaded", {"outputPath": "downloaded"}],
+          "command": ["sh", "-c", "(PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip
+          install --quiet --no-warn-script-location ''google-cloud-storage~=2.7.0''
+          || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+          ''google-cloud-storage~=2.7.0'' --user) && \"$0\" \"$@\"", "sh", "-ec",
+          "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def _make_parent_dirs_and_return_path(file_path:
+          str):\n    import os\n    os.makedirs(os.path.dirname(file_path), exist_ok=True)\n    return
+          file_path\n\ndef download_file_from_gcs_bucket(\n    gcs_bucket_name, file_name,
+          downloaded_path\n):\n    \"\"\"Function to download data from gcs bucket.\"\"\"\n    from
+          google.cloud import storage\n\n    client = storage.Client()\n    bucket
+          = client.bucket(gcs_bucket_name)\n    blob = bucket.blob(file_name)\n    blob.download_to_filename(downloaded_path)\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Download file from gcs
+          bucket'', description=''Function to download data from gcs bucket.'')\n_parser.add_argument(\"--gcs-bucket-name\",
+          dest=\"gcs_bucket_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--file-name\",
+          dest=\"file_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--downloaded\",
+          dest=\"downloaded_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = download_file_from_gcs_bucket(**_parsed_args)\n"], "image": "python:3.10.8-buster"}},
+          "inputs": [{"name": "gcs_bucket_name", "type": "String"}, {"name": "file_name",
+          "type": "String"}], "name": "Download file from gcs bucket", "outputs":
+          [{"name": "downloaded"}]}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"file_name": "{{inputs.parameters.file_name}}",
+          "gcs_bucket_name": "{{inputs.parameters.gcs_bucket_name}}"}', pipelines.kubeflow.org/max_cache_staleness: P0D}
   - name: hello-world-pipeline
     inputs:
       parameters:
+      - {name: file_name}
+      - {name: gcs_bucket_name}
       - {name: user_name}
     dag:
       tasks:
+      - name: download-file-from-gcs-bucket
+        template: download-file-from-gcs-bucket
+        arguments:
+          parameters:
+          - {name: file_name, value: '{{inputs.parameters.file_name}}'}
+          - {name: gcs_bucket_name, value: '{{inputs.parameters.gcs_bucket_name}}'}
       - name: say-hello
         template: say-hello
         arguments:
@@ -41,7 +133,7 @@ spec:
         _parsed_args = vars(_parser.parse_args())
 
         _outputs = say_hello(**_parsed_args)
-      image: python:3.11.1-slim-buster
+      image: python:3.10.8-slim-buster
     inputs:
       parameters:
       - {name: user_name}
@@ -59,11 +151,13 @@ spec:
           hello'', description=''Function to say hello.'')\n_parser.add_argument(\"--user-name\",
           dest=\"user_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args
           = vars(_parser.parse_args())\n\n_outputs = say_hello(**_parsed_args)\n"],
-          "image": "python:3.11.1-slim-buster"}}, "inputs": [{"name": "user_name",
+          "image": "python:3.10.8-slim-buster"}}, "inputs": [{"name": "user_name",
           "type": "String"}], "name": "Say hello"}', pipelines.kubeflow.org/component_ref: '{}',
         pipelines.kubeflow.org/arguments.parameters: '{"user_name": "{{inputs.parameters.user_name}}"}',
         pipelines.kubeflow.org/max_cache_staleness: P0D}
   arguments:
     parameters:
     - {name: user_name}
+    - {name: gcs_bucket_name}
+    - {name: file_name}
   serviceAccountName: pipeline-runner
