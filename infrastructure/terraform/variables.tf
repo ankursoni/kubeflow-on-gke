@@ -25,12 +25,12 @@ variable "machine_type_pool02" {
 }
 variable "node_count_pool02" {
   type    = number
-  default = 1
+  default = 0
 }
 variable "machine_type_pool03" {
-  default = "t2a-standard-1"
+  default = "e2-medium"
 }
 variable "node_count_pool03" {
   type    = number
-  default = 1
+  default = 0
 }

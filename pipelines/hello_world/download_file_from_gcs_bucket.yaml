@@ -7,14 +7,8 @@ outputs:
 - {name: downloaded}
 implementation:
   container:
-    image: python:3.10.8-buster
+    image: eu.gcr.io/kubeflow-bg-experiment/hello_world:latest
     command:
-    - sh
-    - -c
-    - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
-      'google-cloud-storage~=2.7.0' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m
-      pip install --quiet --no-warn-script-location 'google-cloud-storage~=2.7.0'
-      --user) && "$0" "$@"
     - sh
     - -ec
     - |

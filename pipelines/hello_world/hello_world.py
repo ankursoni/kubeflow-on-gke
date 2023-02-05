@@ -11,7 +11,7 @@ def say_hello(user_name: str) -> None:
 
 
 say_hello_op = kfp.components.create_component_from_func(
-    say_hello, base_image="python:3.10.8-slim-buster"
+    say_hello, base_image="python:3.9.15-slim-buster"
 )
 
 
@@ -30,9 +30,10 @@ def download_file_from_gcs_bucket(
 download_file_from_gcs_bucket_op = kfp.components.create_component_from_func(
     download_file_from_gcs_bucket,
     output_component_file="download_file_from_gcs_bucket.yaml",
-    # base_image="eu.gcr.io/kubeflow-on-gke/hello_world:latest",
-    base_image="python:3.10.8-buster",
-    packages_to_install=["google-cloud-storage~=2.7.0"]
+    base_image="eu.gcr.io/kubeflow-bg-experiment/hello_world:latest",
+    # # alternatively,
+    # base_image="python:3.9.15-buster",
+    # packages_to_install=["google-cloud-storage~=2.7.0"],
 )
 
 
@@ -55,7 +56,7 @@ def hello_world_pipeline(user_name, gcs_bucket_name, file_name):
     download_file_from_gcs_bucket_task.execution_options.caching_strategy.max_cache_staleness = (
         "P0D"
     )
-    # # try pipeline based on arm64
+    # # try pipeline task on nodes based on arm64, possible in future after this issue fix: https://github.com/kubeflow/kubeflow/issues/2337
     # download_file_from_gcs_bucket_task.add_toleration(
     #     {"key": "kubernetes.io/arch", "value": "arm64"}
     # )
