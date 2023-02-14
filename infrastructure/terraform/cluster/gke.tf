@@ -156,7 +156,7 @@ resource "google_container_node_pool" "nodepool03" {
   node_locations = [var.zone]
 
   node_config {
-    machine_type = var.machine_type_pool02
+    machine_type = var.machine_type_pool03
     disk_type    = "pd-ssd"
     disk_size_gb = 50
 

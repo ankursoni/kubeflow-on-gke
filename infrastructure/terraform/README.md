@@ -134,11 +134,45 @@ kubectl port-forward --namespace kubeflow svc/ml-pipeline-ui 3000:80
 
 ## Cloud IAP
 Setup Cloud IAP:
-- https://googlecloudplatform.github.io/kubeflow-gke-docs/docs/deploy/oauth-setup/
-- https://cloud.google.com/iap/docs/
+- With kubernetes ingress:
+  - https://cloud.google.com/iap/docs/enabling-kubernetes-howto
+  - https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#create_backendconfig
+  - https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#create_ingress
+- With kubeflow management cluster: https://googlecloudplatform.github.io/kubeflow-gke-docs/docs/deploy/oauth-setup/
+- Identity Aware Proxy (IAP): https://cloud.google.com/iap/docs/
 ```shell
-TODO:
+# step 1: enable https load balancer and ingress to ml-pipeline-ui kubernetes service
+
+# enable backendconfig and ingress on ml-pipeline-ui service
+kubectl apply -f ingress.yaml
+
+# edit the manifest for ml-pipeline-ui service with the following additional annotation
+kubectl edit -n kubeflow svc/ml-pipeline-ui
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   annotations:
+#     cloud.google.com/backend-config: '{"ports": {"80":"mlpipelineui-backendconfig"}}'
+
+# wait for the external ip address creation
+kubectl describe -n kubeflow ingress/mlpipelineui-ingress
+
+# browse the endpoint
+http://<IP Address>
+# example,
+http://34.120.12.10
+
+# step 2: enable IAP on the above endpoint by following the guide in https://cloud.google.com/iap/docs/enabling-kubernetes-howto
 ```
+
+## Cloud logging
+Cloud logging is enabled by default for all infrastructure logs and metrics as well as app logs via fluentbit logging agent running on each node:
+- https://cloud.google.com/stackdriver/docs/solutions/gke/managing-logs#collecting_logs
+
+## TFX on Kubeflow
+TFX can run as pipeline step or series of steps as available in the sample Kubeflow pipeline pre-installed:
+[Demo] TFX - Taxi tip prediction model trainer
+https://github.com/kubeflow/pipelines/tree/master/samples/core/parameterized_tfx_oss
 
 ## Delete Kubeflow v1
 ```shell
