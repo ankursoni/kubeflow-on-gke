@@ -11,7 +11,7 @@ def say_hello(user_name: str) -> None:
 
 
 say_hello_op = kfp.components.create_component_from_func(
-    say_hello, base_image="python:3.9.15-slim-buster"
+    say_hello, base_image="python:3.10.9-slim-buster"
 )
 
 
@@ -32,7 +32,7 @@ download_file_from_gcs_bucket_op = kfp.components.create_component_from_func(
     output_component_file="download_file_from_gcs_bucket.yaml",
     base_image="eu.gcr.io/kubeflow-bg-experiment/hello_world:latest",
     # # alternatively,
-    # base_image="python:3.9.15-buster",
+    # base_image="python:3.10.9-buster",
     # packages_to_install=["google-cloud-storage~=2.7.0"],
 )
 

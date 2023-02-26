@@ -80,7 +80,7 @@ resource "google_container_node_pool" "nodepool01" {
   }
 
   autoscaling {
-    min_node_count = 1
+    min_node_count = var.node_count_pool01
     max_node_count = 5
   }
 
@@ -127,7 +127,7 @@ resource "google_container_node_pool" "nodepool02" {
   }
 
   autoscaling {
-    min_node_count = 1
+    min_node_count = var.node_count_pool02
     max_node_count = 5
   }
 
@@ -176,7 +176,7 @@ resource "google_container_node_pool" "nodepool03" {
   }
 
   autoscaling {
-    min_node_count = 1
+    min_node_count = var.node_count_pool03
     max_node_count = 20
   }
 

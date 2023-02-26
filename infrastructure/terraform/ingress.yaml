@@ -9,6 +9,10 @@ spec:
     drainingTimeoutSec: 60
   sessionAffinity:
     affinityType: CLIENT_IP
+  iap:
+    enabled: true
+    oauthclientCredentials:
+      secretName: iap-secret
 
 ---
 

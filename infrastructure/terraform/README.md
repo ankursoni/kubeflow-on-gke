@@ -109,7 +109,9 @@ Setup authentication pipelines:
 - https://v1-6-branch.kubeflow.org/docs/distributions/gke/authentication/
 
 ```shell
-export PROJECT_ID="<PROJECT ID>" # example, kubeflow-bg-experiment
+export PROJECT_ID="<PROJECT ID>"
+# example,
+export PROJECT_ID="kubeflow-bg-experiment"
 export NAMESPACE="kubeflow"
 export GSA="gke01-kfp-user@${PROJECT_ID}.iam.gserviceaccount.com"
 export KSA="pipeline-runner"
@@ -121,7 +123,7 @@ kubectl annotate serviceaccount \
   $KSA \
   iam.gke.io/gcp-service-account=$GSA
 
-# run the above for the following combination as well
+# run the above for the following combinations as well
 export GSA="gke01-kfp-system@${PROJECT_ID}.iam.gserviceaccount.com"
 export KSA="ml-pipeline-ui"
 
@@ -142,6 +144,8 @@ Setup Cloud IAP:
 - Identity Aware Proxy (IAP): https://cloud.google.com/iap/docs/
 ```shell
 # step 1: enable https load balancer and ingress to ml-pipeline-ui kubernetes service
+
+cd infrastructure/terraform
 
 # enable backendconfig and ingress on ml-pipeline-ui service
 kubectl apply -f ingress.yaml
