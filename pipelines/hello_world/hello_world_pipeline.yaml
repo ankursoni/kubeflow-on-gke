@@ -2,11 +2,11 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: hello-world-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18, pipelines.kubeflow.org/pipeline_compilation_time: '2023-02-06T09:15:28.148143',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-04T21:48:13.453085',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Hello world pipeline",
       "inputs": [{"name": "user_name"}, {"name": "gcs_bucket_name"}, {"name": "file_name"}],
       "name": "Hello world pipeline"}'}
-  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.18}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
 spec:
   entrypoint: hello-world-pipeline
   templates:
@@ -57,7 +57,7 @@ spec:
       - {name: download-file-from-gcs-bucket-downloaded, path: /tmp/outputs/downloaded/data}
     metadata:
       labels:
-        pipelines.kubeflow.org/kfp_sdk_version: 1.8.18
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
         pipelines.kubeflow.org/pipeline-sdk-type: kfp
         pipelines.kubeflow.org/enable_caching: "false"
       annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Function
@@ -123,13 +123,13 @@ spec:
         _parsed_args = vars(_parser.parse_args())
 
         _outputs = say_hello(**_parsed_args)
-      image: python:3.9.15-slim-buster
+      image: python:3.10.9-slim-buster
     inputs:
       parameters:
       - {name: user_name}
     metadata:
       labels:
-        pipelines.kubeflow.org/kfp_sdk_version: 1.8.18
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
         pipelines.kubeflow.org/pipeline-sdk-type: kfp
         pipelines.kubeflow.org/enable_caching: "false"
       annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Function
@@ -141,7 +141,7 @@ spec:
           hello'', description=''Function to say hello.'')\n_parser.add_argument(\"--user-name\",
           dest=\"user_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args
           = vars(_parser.parse_args())\n\n_outputs = say_hello(**_parsed_args)\n"],
-          "image": "python:3.9.15-slim-buster"}}, "inputs": [{"name": "user_name",
+          "image": "python:3.10.9-slim-buster"}}, "inputs": [{"name": "user_name",
           "type": "String"}], "name": "Say hello"}', pipelines.kubeflow.org/component_ref: '{}',
         pipelines.kubeflow.org/arguments.parameters: '{"user_name": "{{inputs.parameters.user_name}}"}',
         pipelines.kubeflow.org/max_cache_staleness: P0D}

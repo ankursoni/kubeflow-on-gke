@@ -1,0 +1,490 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: listwise-ranking-pipeline-
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-05T00:03:58.170262',
+    pipelines.kubeflow.org/pipeline_spec: '{"description": "Listwise ranking pipeline",
+      "inputs": [{"name": "gcs_bucket_name"}], "name": "Listwise ranking pipeline"}'}
+  labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
+spec:
+  entrypoint: listwise-ranking-pipeline
+  templates:
+  - name: build-model
+    container:
+      args: [--unique-user-ids, /tmp/inputs/unique_user_ids/data, --unique-movie-titles,
+        /tmp/inputs/unique_movie_titles/data, --train, /tmp/inputs/train/data, --test,
+        /tmp/inputs/test/data, --model, /tmp/outputs/model/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def build_model(
+            unique_user_ids_path,
+            unique_movie_titles_path,
+            train_path,
+            test_path,
+            model_path,
+        ):
+            """Function to build model."""
+            import pickle
+
+            import tensorflow as tf
+            import tensorflow_ranking as tfr
+            import tensorflow_recommenders as tfrs
+
+            unique_user_ids = pickle.load(unique_user_ids_path)
+            unique_movie_titles = pickle.load(unique_movie_titles_path)
+
+            class RankingModel(tfrs.Model):
+                def __init__(self, loss):
+                    super().__init__()
+                    embedding_dimension = 32
+
+                    # Compute embeddings for users.
+                    self.user_embeddings = tf.keras.Sequential(
+                        [
+                            tf.keras.layers.StringLookup(vocabulary=unique_user_ids),
+                            tf.keras.layers.Embedding(
+                                len(unique_user_ids) + 2, embedding_dimension
+                            ),
+                        ]
+                    )
+
+                    # Compute embeddings for movies.
+                    self.movie_embeddings = tf.keras.Sequential(
+                        [
+                            tf.keras.layers.StringLookup(vocabulary=unique_movie_titles),
+                            tf.keras.layers.Embedding(
+                                len(unique_movie_titles) + 2, embedding_dimension
+                            ),
+                        ]
+                    )
+
+                    # Compute predictions.
+                    self.score_model = tf.keras.Sequential(
+                        [
+                            # Learn multiple dense layers.
+                            tf.keras.layers.Dense(256, activation="relu"),
+                            tf.keras.layers.Dense(64, activation="relu"),
+                            # Make rating predictions in the final layer.
+                            tf.keras.layers.Dense(1),
+                        ]
+                    )
+
+                    self.task = tfrs.tasks.Ranking(
+                        loss=loss,
+                        metrics=[
+                            tfr.keras.metrics.NDCGMetric(name="ndcg_metric"),
+                            tf.keras.metrics.RootMeanSquaredError(),
+                        ],
+                    )
+
+                def call(self, features):
+                    # We first convert the id features into embeddings.
+                    # User embeddings are a [batch_size, embedding_dim] tensor.
+                    user_embeddings = self.user_embeddings(features["user_id"])
+
+                    # Movie embeddings are a [batch_size, num_movies_in_list, embedding_dim]
+                    # tensor.
+                    movie_embeddings = self.movie_embeddings(features["movie_title"])
+
+                    # We want to concatenate user embeddings with movie emebeddings to pass
+                    # them into the ranking model. To do so, we need to reshape the user
+                    # embeddings to match the shape of movie embeddings.
+                    list_length = features["movie_title"].shape[1]
+                    user_embedding_repeated = tf.repeat(
+                        tf.expand_dims(user_embeddings, 1), [list_length], axis=1
+                    )
+
+                    # Once reshaped, we concatenate and pass into the dense layers to generate
+                    # predictions.
+                    concatenated_embeddings = tf.concat(
+                        [user_embedding_repeated, movie_embeddings], 2
+                    )
+
+                    return self.score_model(concatenated_embeddings)
+
+                def compute_loss(self, features, training=False):
+                    labels = features.pop("user_rating")
+
+                    scores = self(features)
+
+                    return self.task(
+                        labels=labels,
+                        predictions=tf.squeeze(scores, axis=-1),
+                    )
+
+            train = pickle.load(train_path)
+            test = pickle.load(test_path)
+
+            cached_train = train.shuffle(100_000).batch(8192).cache()
+            # # TODO
+            # cached_test = test.batch(4096).cache()
+
+            listwise_model = RankingModel(tfr.keras.losses.ListMLELoss())
+            listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))
+
+            epochs = 1
+            listwise_model.fit(cached_train, epochs=epochs, verbose=False)
+
+            tf.saved_model.save(listwise_model, f"{model_path}")
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
+        _parser.add_argument("--unique-user-ids", dest="unique_user_ids_path", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--unique-movie-titles", dest="unique_movie_titles_path", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--test", dest="test_path", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--model", dest="model_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = build_model(**_parsed_args)
+      image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+    inputs:
+      artifacts:
+      - {name: prepare-dataset-test, path: /tmp/inputs/test/data}
+      - {name: prepare-dataset-train, path: /tmp/inputs/train/data}
+      - {name: prepare-dataset-unique_movie_titles, path: /tmp/inputs/unique_movie_titles/data}
+      - {name: prepare-dataset-unique_user_ids, path: /tmp/inputs/unique_user_ids/data}
+    outputs:
+      artifacts:
+      - {name: build-model-model, path: /tmp/outputs/model/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "false"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Function
+          to build model.", "implementation": {"container": {"args": ["--unique-user-ids",
+          {"inputPath": "unique_user_ids"}, "--unique-movie-titles", {"inputPath":
+          "unique_movie_titles"}, "--train", {"inputPath": "train"}, "--test", {"inputPath":
+          "test"}, "--model", {"outputPath": "model"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
+          exist_ok=True)\n    return file_path\n\ndef build_model(\n    unique_user_ids_path,\n    unique_movie_titles_path,\n    train_path,\n    test_path,\n    model_path,\n):\n    \"\"\"Function
+          to build model.\"\"\"\n    import pickle\n\n    import tensorflow as tf\n    import
+          tensorflow_ranking as tfr\n    import tensorflow_recommenders as tfrs\n\n    unique_user_ids
+          = pickle.load(unique_user_ids_path)\n    unique_movie_titles = pickle.load(unique_movie_titles_path)\n\n    class
+          RankingModel(tfrs.Model):\n        def __init__(self, loss):\n            super().__init__()\n            embedding_dimension
+          = 32\n\n            # Compute embeddings for users.\n            self.user_embeddings
+          = tf.keras.Sequential(\n                [\n                    tf.keras.layers.StringLookup(vocabulary=unique_user_ids),\n                    tf.keras.layers.Embedding(\n                        len(unique_user_ids)
+          + 2, embedding_dimension\n                    ),\n                ]\n            )\n\n            #
+          Compute embeddings for movies.\n            self.movie_embeddings = tf.keras.Sequential(\n                [\n                    tf.keras.layers.StringLookup(vocabulary=unique_movie_titles),\n                    tf.keras.layers.Embedding(\n                        len(unique_movie_titles)
+          + 2, embedding_dimension\n                    ),\n                ]\n            )\n\n            #
+          Compute predictions.\n            self.score_model = tf.keras.Sequential(\n                [\n                    #
+          Learn multiple dense layers.\n                    tf.keras.layers.Dense(256,
+          activation=\"relu\"),\n                    tf.keras.layers.Dense(64, activation=\"relu\"),\n                    #
+          Make rating predictions in the final layer.\n                    tf.keras.layers.Dense(1),\n                ]\n            )\n\n            self.task
+          = tfrs.tasks.Ranking(\n                loss=loss,\n                metrics=[\n                    tfr.keras.metrics.NDCGMetric(name=\"ndcg_metric\"),\n                    tf.keras.metrics.RootMeanSquaredError(),\n                ],\n            )\n\n        def
+          call(self, features):\n            # We first convert the id features into
+          embeddings.\n            # User embeddings are a [batch_size, embedding_dim]
+          tensor.\n            user_embeddings = self.user_embeddings(features[\"user_id\"])\n\n            #
+          Movie embeddings are a [batch_size, num_movies_in_list, embedding_dim]\n            #
+          tensor.\n            movie_embeddings = self.movie_embeddings(features[\"movie_title\"])\n\n            #
+          We want to concatenate user embeddings with movie emebeddings to pass\n            #
+          them into the ranking model. To do so, we need to reshape the user\n            #
+          embeddings to match the shape of movie embeddings.\n            list_length
+          = features[\"movie_title\"].shape[1]\n            user_embedding_repeated
+          = tf.repeat(\n                tf.expand_dims(user_embeddings, 1), [list_length],
+          axis=1\n            )\n\n            # Once reshaped, we concatenate and
+          pass into the dense layers to generate\n            # predictions.\n            concatenated_embeddings
+          = tf.concat(\n                [user_embedding_repeated, movie_embeddings],
+          2\n            )\n\n            return self.score_model(concatenated_embeddings)\n\n        def
+          compute_loss(self, features, training=False):\n            labels = features.pop(\"user_rating\")\n\n            scores
+          = self(features)\n\n            return self.task(\n                labels=labels,\n                predictions=tf.squeeze(scores,
+          axis=-1),\n            )\n\n    train = pickle.load(train_path)\n    test
+          = pickle.load(test_path)\n\n    cached_train = train.shuffle(100_000).batch(8192).cache()\n    #
+          # TODO\n    # cached_test = test.batch(4096).cache()\n\n    listwise_model
+          = RankingModel(tfr.keras.losses.ListMLELoss())\n    listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))\n\n    epochs
+          = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    tf.saved_model.save(listwise_model,
+          f\"{model_path}\")\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Build
+          model'', description=''Function to build model.'')\n_parser.add_argument(\"--unique-user-ids\",
+          dest=\"unique_user_ids_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
+          dest=\"unique_movie_titles_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--train\",
+          dest=\"train_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
+          dest=\"test_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model\",
+          dest=\"model_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = build_model(**_parsed_args)\n"], "image": "eu.gcr.io/kubeflow-bg-experiment/recommender:latest"}},
+          "inputs": [{"name": "unique_user_ids"}, {"name": "unique_movie_titles"},
+          {"name": "train"}, {"name": "test"}], "name": "Build model", "outputs":
+          [{"name": "model"}]}', pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/max_cache_staleness: P0D}
+  - name: listwise-ranking-pipeline
+    inputs:
+      parameters:
+      - {name: gcs_bucket_name}
+    dag:
+      tasks:
+      - name: build-model
+        template: build-model
+        dependencies: [prepare-dataset]
+        arguments:
+          artifacts:
+          - {name: prepare-dataset-test, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-test}}'}
+          - {name: prepare-dataset-train, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-train}}'}
+          - {name: prepare-dataset-unique_movie_titles, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-unique_movie_titles}}'}
+          - {name: prepare-dataset-unique_user_ids, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-unique_user_ids}}'}
+      - {name: prepare-dataset, template: prepare-dataset}
+      - name: trained-files-to-gcs
+        template: trained-files-to-gcs
+        dependencies: [build-model]
+        arguments:
+          parameters:
+          - {name: gcs_bucket_name, value: '{{inputs.parameters.gcs_bucket_name}}'}
+          artifacts:
+          - {name: build-model-model, from: '{{tasks.build-model.outputs.artifacts.build-model-model}}'}
+  - name: prepare-dataset
+    container:
+      args: [--train, /tmp/outputs/train/data, --test, /tmp/outputs/test/data, --unique-movie-titles,
+        /tmp/outputs/unique_movie_titles/data, --unique-user-ids, /tmp/outputs/unique_user_ids/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def _make_parent_dirs_and_return_path(file_path: str):
+            import os
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            return file_path
+
+        def prepare_dataset(
+            train_path,
+            test_path,
+            unique_movie_titles_path,
+            unique_user_ids_path,
+        ):
+            """Function to prepare dataset."""
+            import pickle
+
+            import numpy as np
+            import tensorflow as tf
+            import tensorflow_datasets as tfds
+            import tensorflow_recommenders as tfrs
+
+            ratings = tfds.load("movielens/100k-ratings", split="train")
+            movies = tfds.load("movielens/100k-movies", split="train")
+
+            ratings = ratings.map(
+                lambda x: {
+                    "movie_title": x["movie_title"],
+                    "user_id": x["user_id"],
+                    "user_rating": x["user_rating"],
+                }
+            )
+            movies = movies.map(lambda x: x["movie_title"])
+
+            unique_movie_titles = np.unique(np.concatenate(list(movies.batch(1000))))
+            unique_user_ids = np.unique(
+                np.concatenate(list(ratings.batch(1_000).map(lambda x: x["user_id"])))
+            )
+
+            pickle.dump(unique_movie_titles, unique_movie_titles_path)
+            pickle.dump(unique_user_ids, unique_user_ids_path)
+
+            tf.random.set_seed(42)
+
+            # Split between train and tests sets, as before.
+            shuffled = ratings.shuffle(100_000, seed=42, reshuffle_each_iteration=False)
+
+            train = shuffled.take(80_000)
+            test = shuffled.skip(80_000).take(20_000)
+
+            # We sample 50 lists for each user for the training data. For each list we
+            # sample 5 movies from the movies the user rated.
+            train = tfrs.examples.movielens.sample_listwise(
+                train, num_list_per_user=50, num_examples_per_list=5, seed=42
+            )
+            test = tfrs.examples.movielens.sample_listwise(
+                test, num_list_per_user=1, num_examples_per_list=5, seed=42
+            )
+
+            pickle.dump(train, train_path)
+            pickle.dump(test, test_path)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')
+        _parser.add_argument("--train", dest="train_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--test", dest="test_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--unique-movie-titles", dest="unique_movie_titles_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--unique-user-ids", dest="unique_user_ids_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parsed_args = vars(_parser.parse_args())
+
+        _outputs = prepare_dataset(**_parsed_args)
+      image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+    outputs:
+      artifacts:
+      - {name: prepare-dataset-test, path: /tmp/outputs/test/data}
+      - {name: prepare-dataset-train, path: /tmp/outputs/train/data}
+      - {name: prepare-dataset-unique_movie_titles, path: /tmp/outputs/unique_movie_titles/data}
+      - {name: prepare-dataset-unique_user_ids, path: /tmp/outputs/unique_user_ids/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "false"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Function
+          to prepare dataset.", "implementation": {"container": {"args": ["--train",
+          {"outputPath": "train"}, "--test", {"outputPath": "test"}, "--unique-movie-titles",
+          {"outputPath": "unique_movie_titles"}, "--unique-user-ids", {"outputPath":
+          "unique_user_ids"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
+          exist_ok=True)\n    return file_path\n\ndef prepare_dataset(\n    train_path,\n    test_path,\n    unique_movie_titles_path,\n    unique_user_ids_path,\n):\n    \"\"\"Function
+          to prepare dataset.\"\"\"\n    import pickle\n\n    import numpy as np\n    import
+          tensorflow as tf\n    import tensorflow_datasets as tfds\n    import tensorflow_recommenders
+          as tfrs\n\n    ratings = tfds.load(\"movielens/100k-ratings\", split=\"train\")\n    movies
+          = tfds.load(\"movielens/100k-movies\", split=\"train\")\n\n    ratings =
+          ratings.map(\n        lambda x: {\n            \"movie_title\": x[\"movie_title\"],\n            \"user_id\":
+          x[\"user_id\"],\n            \"user_rating\": x[\"user_rating\"],\n        }\n    )\n    movies
+          = movies.map(lambda x: x[\"movie_title\"])\n\n    unique_movie_titles =
+          np.unique(np.concatenate(list(movies.batch(1000))))\n    unique_user_ids
+          = np.unique(\n        np.concatenate(list(ratings.batch(1_000).map(lambda
+          x: x[\"user_id\"])))\n    )\n\n    pickle.dump(unique_movie_titles, unique_movie_titles_path)\n    pickle.dump(unique_user_ids,
+          unique_user_ids_path)\n\n    tf.random.set_seed(42)\n\n    # Split between
+          train and tests sets, as before.\n    shuffled = ratings.shuffle(100_000,
+          seed=42, reshuffle_each_iteration=False)\n\n    train = shuffled.take(80_000)\n    test
+          = shuffled.skip(80_000).take(20_000)\n\n    # We sample 50 lists for each
+          user for the training data. For each list we\n    # sample 5 movies from
+          the movies the user rated.\n    train = tfrs.examples.movielens.sample_listwise(\n        train,
+          num_list_per_user=50, num_examples_per_list=5, seed=42\n    )\n    test
+          = tfrs.examples.movielens.sample_listwise(\n        test, num_list_per_user=1,
+          num_examples_per_list=5, seed=42\n    )\n\n    pickle.dump(train, train_path)\n    pickle.dump(test,
+          test_path)\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Prepare
+          dataset'', description=''Function to prepare dataset.'')\n_parser.add_argument(\"--train\",
+          dest=\"train_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\", dest=\"test_path\",
+          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
+          dest=\"unique_movie_titles_path\", type=_make_parent_dirs_and_return_path,
+          required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-user-ids\",
+          dest=\"unique_user_ids_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
+          = prepare_dataset(**_parsed_args)\n"], "image": "eu.gcr.io/kubeflow-bg-experiment/recommender:latest"}},
+          "name": "Prepare dataset", "outputs": [{"name": "train"}, {"name": "test"},
+          {"name": "unique_movie_titles"}, {"name": "unique_user_ids"}]}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/max_cache_staleness: P0D}
+  - name: trained-files-to-gcs
+    container:
+      args: [--gcs-bucket-name, '{{inputs.parameters.gcs_bucket_name}}', --model,
+        /tmp/inputs/model/data, '----output-paths', /tmp/outputs/Output/data]
+      command:
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp)
+        printf "%s" "$0" > "$program_path"
+        python3 -u "$program_path" "$@"
+      - |
+        def trained_files_to_gcs(
+            # test_result: bool,
+            gcs_bucket_name,
+            model_path,
+        ):
+            """Function to upload training output to gcs bucket."""
+            from google.cloud import storage
+
+            # if not test_result:
+            #     return
+
+            client = storage.Client()
+            bucket = client.bucket(gcs_bucket_name)
+
+            with open(file=f"{model_path}/listwise_ranking_model.h5", mode="rb") as file:
+                blob = bucket.blob("listwise_ranking_model.h5")
+                blob.upload_from_file(file, content_type="bytes")
+
+            return True
+
+        def _serialize_bool(bool_value: bool) -> str:
+            if isinstance(bool_value, str):
+                return bool_value
+            if not isinstance(bool_value, bool):
+                raise TypeError('Value "{}" has type "{}" instead of bool.'.format(
+                    str(bool_value), str(type(bool_value))))
+            return str(bool_value)
+
+        import argparse
+        _parser = argparse.ArgumentParser(prog='Trained files to gcs', description='Function to upload training output to gcs bucket.')
+        _parser.add_argument("--gcs-bucket-name", dest="gcs_bucket_name", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=1)
+        _parsed_args = vars(_parser.parse_args())
+        _output_files = _parsed_args.pop("_output_paths", [])
+
+        _outputs = trained_files_to_gcs(**_parsed_args)
+
+        _outputs = [_outputs]
+
+        _output_serializers = [
+            _serialize_bool,
+
+        ]
+
+        import os
+        for idx, output_file in enumerate(_output_files):
+            try:
+                os.makedirs(os.path.dirname(output_file))
+            except OSError:
+                pass
+            with open(output_file, 'w') as f:
+                f.write(_output_serializers[idx](_outputs[idx]))
+      image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+      imagePullPolicy: Always
+    inputs:
+      parameters:
+      - {name: gcs_bucket_name}
+      artifacts:
+      - {name: build-model-model, path: /tmp/inputs/model/data}
+    outputs:
+      artifacts:
+      - {name: trained-files-to-gcs-Output, path: /tmp/outputs/Output/data}
+    metadata:
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/enable_caching: "false"
+      annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Function
+          to upload training output to gcs bucket.", "implementation": {"container":
+          {"args": ["--gcs-bucket-name", {"inputValue": "gcs_bucket_name"}, "--model",
+          {"inputPath": "model"}, "----output-paths", {"outputPath": "Output"}], "command":
+          ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
+          -u \"$program_path\" \"$@\"\n", "def trained_files_to_gcs(\n    # test_result:
+          bool,\n    gcs_bucket_name,\n    model_path,\n):\n    \"\"\"Function to
+          upload training output to gcs bucket.\"\"\"\n    from google.cloud import
+          storage\n\n    # if not test_result:\n    #     return\n\n    client = storage.Client()\n    bucket
+          = client.bucket(gcs_bucket_name)\n\n    with open(file=f\"{model_path}/listwise_ranking_model.h5\",
+          mode=\"rb\") as file:\n        blob = bucket.blob(\"listwise_ranking_model.h5\")\n        blob.upload_from_file(file,
+          content_type=\"bytes\")\n\n    return True\n\ndef _serialize_bool(bool_value:
+          bool) -> str:\n    if isinstance(bool_value, str):\n        return bool_value\n    if
+          not isinstance(bool_value, bool):\n        raise TypeError(''Value \"{}\"
+          has type \"{}\" instead of bool.''.format(\n            str(bool_value),
+          str(type(bool_value))))\n    return str(bool_value)\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Trained files to gcs'', description=''Function
+          to upload training output to gcs bucket.'')\n_parser.add_argument(\"--gcs-bucket-name\",
+          dest=\"gcs_bucket_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model\",
+          dest=\"model_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
+          dest=\"_output_paths\", type=str, nargs=1)\n_parsed_args = vars(_parser.parse_args())\n_output_files
+          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = trained_files_to_gcs(**_parsed_args)\n\n_outputs
+          = [_outputs]\n\n_output_serializers = [\n    _serialize_bool,\n\n]\n\nimport
+          os\nfor idx, output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
+          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
+          "image": "eu.gcr.io/kubeflow-bg-experiment/recommender:latest"}}, "inputs":
+          [{"name": "gcs_bucket_name", "type": "String"}, {"name": "model"}], "name":
+          "Trained files to gcs", "outputs": [{"name": "Output", "type": "Boolean"}]}',
+        pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/arguments.parameters: '{"gcs_bucket_name":
+          "{{inputs.parameters.gcs_bucket_name}}"}', pipelines.kubeflow.org/max_cache_staleness: P0D}
+  arguments:
+    parameters:
+    - {name: gcs_bucket_name}
+  serviceAccountName: pipeline-runner

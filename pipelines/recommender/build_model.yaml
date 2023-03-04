@@ -1,0 +1,157 @@
+name: Build model
+description: Function to build model.
+inputs:
+- {name: unique_user_ids}
+- {name: unique_movie_titles}
+- {name: train}
+- {name: test}
+outputs:
+- {name: model}
+implementation:
+  container:
+    image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+    command:
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      def _make_parent_dirs_and_return_path(file_path: str):
+          import os
+          os.makedirs(os.path.dirname(file_path), exist_ok=True)
+          return file_path
+
+      def build_model(
+          unique_user_ids_path,
+          unique_movie_titles_path,
+          train_path,
+          test_path,
+          model_path,
+      ):
+          """Function to build model."""
+          import pickle
+
+          import tensorflow as tf
+          import tensorflow_ranking as tfr
+          import tensorflow_recommenders as tfrs
+
+          unique_user_ids = pickle.load(unique_user_ids_path)
+          unique_movie_titles = pickle.load(unique_movie_titles_path)
+
+          class RankingModel(tfrs.Model):
+              def __init__(self, loss):
+                  super().__init__()
+                  embedding_dimension = 32
+
+                  # Compute embeddings for users.
+                  self.user_embeddings = tf.keras.Sequential(
+                      [
+                          tf.keras.layers.StringLookup(vocabulary=unique_user_ids),
+                          tf.keras.layers.Embedding(
+                              len(unique_user_ids) + 2, embedding_dimension
+                          ),
+                      ]
+                  )
+
+                  # Compute embeddings for movies.
+                  self.movie_embeddings = tf.keras.Sequential(
+                      [
+                          tf.keras.layers.StringLookup(vocabulary=unique_movie_titles),
+                          tf.keras.layers.Embedding(
+                              len(unique_movie_titles) + 2, embedding_dimension
+                          ),
+                      ]
+                  )
+
+                  # Compute predictions.
+                  self.score_model = tf.keras.Sequential(
+                      [
+                          # Learn multiple dense layers.
+                          tf.keras.layers.Dense(256, activation="relu"),
+                          tf.keras.layers.Dense(64, activation="relu"),
+                          # Make rating predictions in the final layer.
+                          tf.keras.layers.Dense(1),
+                      ]
+                  )
+
+                  self.task = tfrs.tasks.Ranking(
+                      loss=loss,
+                      metrics=[
+                          tfr.keras.metrics.NDCGMetric(name="ndcg_metric"),
+                          tf.keras.metrics.RootMeanSquaredError(),
+                      ],
+                  )
+
+              def call(self, features):
+                  # We first convert the id features into embeddings.
+                  # User embeddings are a [batch_size, embedding_dim] tensor.
+                  user_embeddings = self.user_embeddings(features["user_id"])
+
+                  # Movie embeddings are a [batch_size, num_movies_in_list, embedding_dim]
+                  # tensor.
+                  movie_embeddings = self.movie_embeddings(features["movie_title"])
+
+                  # We want to concatenate user embeddings with movie emebeddings to pass
+                  # them into the ranking model. To do so, we need to reshape the user
+                  # embeddings to match the shape of movie embeddings.
+                  list_length = features["movie_title"].shape[1]
+                  user_embedding_repeated = tf.repeat(
+                      tf.expand_dims(user_embeddings, 1), [list_length], axis=1
+                  )
+
+                  # Once reshaped, we concatenate and pass into the dense layers to generate
+                  # predictions.
+                  concatenated_embeddings = tf.concat(
+                      [user_embedding_repeated, movie_embeddings], 2
+                  )
+
+                  return self.score_model(concatenated_embeddings)
+
+              def compute_loss(self, features, training=False):
+                  labels = features.pop("user_rating")
+
+                  scores = self(features)
+
+                  return self.task(
+                      labels=labels,
+                      predictions=tf.squeeze(scores, axis=-1),
+                  )
+
+          train = pickle.load(train_path)
+          test = pickle.load(test_path)
+
+          cached_train = train.shuffle(100_000).batch(8192).cache()
+          # # TODO
+          # cached_test = test.batch(4096).cache()
+
+          listwise_model = RankingModel(tfr.keras.losses.ListMLELoss())
+          listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))
+
+          epochs = 1
+          listwise_model.fit(cached_train, epochs=epochs, verbose=False)
+
+          tf.saved_model.save(listwise_model, f"{model_path}")
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
+      _parser.add_argument("--unique-user-ids", dest="unique_user_ids_path", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--unique-movie-titles", dest="unique_movie_titles_path", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--test", dest="test_path", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--model", dest="model_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = build_model(**_parsed_args)
+    args:
+    - --unique-user-ids
+    - {inputPath: unique_user_ids}
+    - --unique-movie-titles
+    - {inputPath: unique_movie_titles}
+    - --train
+    - {inputPath: train}
+    - --test
+    - {inputPath: test}
+    - --model
+    - {outputPath: model}
