@@ -44,6 +44,7 @@ download_file_from_gcs_bucket_op = kfp.components.create_component_from_func(
 def hello_world_pipeline(user_name, gcs_bucket_name, file_name):
     """Function to run hello world pipeline."""
     say_hello_task = say_hello_op(user_name)
+    say_hello_task.container.set_image_pull_policy("Always")
     say_hello_task.set_caching_options(False)
     say_hello_task.execution_options.caching_strategy.max_cache_staleness = "P0D"
 

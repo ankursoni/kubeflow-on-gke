@@ -36,8 +36,10 @@ def prepare_dataset(
         np.concatenate(list(ratings.batch(1_000).map(lambda x: x["user_id"])))
     )
 
-    pickle.dump(unique_movie_titles, unique_movie_titles_path)
-    pickle.dump(unique_user_ids, unique_user_ids_path)
+    with open(file=unique_movie_titles_path, mode="wb") as f:
+        pickle.dump(unique_movie_titles, f)
+    with open(file=unique_user_ids_path, mode="wb") as f:
+        pickle.dump(unique_user_ids, f)
 
     tf.random.set_seed(42)
 
@@ -56,8 +58,10 @@ def prepare_dataset(
         test, num_list_per_user=1, num_examples_per_list=5, seed=42
     )
 
-    pickle.dump(train, train_path)
-    pickle.dump(test, test_path)
+    with open(file=train_path, mode="wb") as f:
+        pickle.dump(train, f)
+    with open(file=test_path, mode="wb") as f:
+        pickle.dump(test, f)
 
 
 prepare_dataset_op = kfp.components.create_component_from_func(
@@ -81,8 +85,10 @@ def build_model(
     import tensorflow_ranking as tfr
     import tensorflow_recommenders as tfrs
 
-    unique_user_ids = pickle.load(unique_user_ids_path)
-    unique_movie_titles = pickle.load(unique_movie_titles_path)
+    with open(file=unique_user_ids_path, mode="rb") as f:
+        unique_user_ids = pickle.load(f)
+    with open(file=unique_movie_titles_path, mode="rb") as f:
+        unique_movie_titles = pickle.load(f)
 
     class RankingModel(tfrs.Model):
         def __init__(self, loss):
@@ -163,8 +169,10 @@ def build_model(
                 predictions=tf.squeeze(scores, axis=-1),
             )
 
-    train = pickle.load(train_path)
-    test = pickle.load(test_path)
+    with open(file=train_path, mode="rb") as f:
+        train = pickle.load(f)
+    with open(file=test_path, mode="rb") as f:
+        test = pickle.load(f)
 
     cached_train = train.shuffle(100_000).batch(8192).cache()
     # # TODO
@@ -221,6 +229,7 @@ trained_files_to_gcs_op = kfp.components.create_component_from_func(
 def listwise_ranking_pipeline(gcs_bucket_name):
     """Function to run listwise ranking pipeline."""
     prepare_dataset_task = prepare_dataset_op()
+    prepare_dataset_task.container.set_image_pull_policy("Always")
     prepare_dataset_task.set_caching_options(False)
     prepare_dataset_task.execution_options.caching_strategy.max_cache_staleness = "P0D"
 
@@ -230,6 +239,7 @@ def listwise_ranking_pipeline(gcs_bucket_name):
         train=prepare_dataset_task.outputs["train"],
         test=prepare_dataset_task.outputs["test"],
     )
+    build_model_task.container.set_image_pull_policy("Always")
     build_model_task.set_caching_options(False)
     build_model_task.execution_options.caching_strategy.max_cache_staleness = "P0D"
 

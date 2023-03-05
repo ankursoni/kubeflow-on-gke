@@ -37,8 +37,10 @@ implementation:
           import tensorflow_ranking as tfr
           import tensorflow_recommenders as tfrs
 
-          unique_user_ids = pickle.load(unique_user_ids_path)
-          unique_movie_titles = pickle.load(unique_movie_titles_path)
+          with open(file=unique_user_ids_path, mode="rb") as f:
+              unique_user_ids = pickle.load(f)
+          with open(file=unique_movie_titles_path, mode="rb") as f:
+              unique_movie_titles = pickle.load(f)
 
           class RankingModel(tfrs.Model):
               def __init__(self, loss):
@@ -119,8 +121,10 @@ implementation:
                       predictions=tf.squeeze(scores, axis=-1),
                   )
 
-          train = pickle.load(train_path)
-          test = pickle.load(test_path)
+          with open(file=train_path, mode="rb") as f:
+              train = pickle.load(f)
+          with open(file=test_path, mode="rb") as f:
+              test = pickle.load(f)
 
           cached_train = train.shuffle(100_000).batch(8192).cache()
           # # TODO

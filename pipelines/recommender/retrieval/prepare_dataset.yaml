@@ -1,0 +1,97 @@
+name: Prepare dataset
+description: Function to prepare dataset.
+outputs:
+- {name: movies}
+- {name: train}
+- {name: test}
+- {name: unique_movie_titles}
+- {name: unique_user_ids}
+implementation:
+  container:
+    image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+    command:
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      def _make_parent_dirs_and_return_path(file_path: str):
+          import os
+          os.makedirs(os.path.dirname(file_path), exist_ok=True)
+          return file_path
+
+      def prepare_dataset(
+          movies_path,
+          train_path,
+          test_path,
+          unique_movie_titles_path,
+          unique_user_ids_path,
+      ):
+          """Function to prepare dataset."""
+          import pickle
+
+          import numpy as np
+          import tensorflow as tf
+          import tensorflow_datasets as tfds
+
+          # Ratings data.
+          ratings = tfds.load("movielens/100k-ratings", split="train")
+          # Features of all the available movies.
+          movies = tfds.load("movielens/100k-movies", split="train")
+
+          with open(file=movies_path, mode="wb") as f:
+              pickle.dump(movies, f)
+
+          ratings = ratings.map(
+              lambda x: {
+                  "movie_title": x["movie_title"],
+                  "user_id": x["user_id"],
+              }
+          )
+          movies = movies.map(lambda x: x["movie_title"])
+
+          tf.random.set_seed(42)
+          shuffled = ratings.shuffle(100_000, seed=42, reshuffle_each_iteration=False)
+
+          train = shuffled.take(80_000)
+          test = shuffled.skip(80_000).take(20_000)
+
+          with open(file=train_path, mode="wb") as f:
+              pickle.dump(train, f)
+          with open(file=test_path, mode="wb") as f:
+              pickle.dump(test, f)
+
+          movie_titles = movies.batch(1_000)
+          user_ids = ratings.batch(1_000_000).map(lambda x: x["user_id"])
+
+          unique_movie_titles = np.unique(np.concatenate(list(movie_titles)))
+          unique_user_ids = np.unique(np.concatenate(list(user_ids)))
+
+          with open(file=unique_movie_titles_path, mode="wb") as f:
+              pickle.dump(unique_movie_titles, f)
+          with open(file=unique_user_ids_path, mode="wb") as f:
+              pickle.dump(unique_user_ids, f)
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')
+      _parser.add_argument("--movies", dest="movies_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--train", dest="train_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--test", dest="test_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--unique-movie-titles", dest="unique_movie_titles_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--unique-user-ids", dest="unique_user_ids_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = prepare_dataset(**_parsed_args)
+    args:
+    - --movies
+    - {outputPath: movies}
+    - --train
+    - {outputPath: train}
+    - --test
+    - {outputPath: test}
+    - --unique-movie-titles
+    - {outputPath: unique_movie_titles}
+    - --unique-user-ids
+    - {outputPath: unique_user_ids}

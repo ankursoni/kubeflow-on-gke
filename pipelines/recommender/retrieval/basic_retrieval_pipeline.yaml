@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: basic-retrieval-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-05T00:03:36.478538',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-06T04:55:28.298711',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Basic retrieval pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Basic retrieval pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
@@ -69,9 +69,11 @@ spec:
 
             embedding_dimension = 32
 
-            movies = pickle.load(movies_path)
+            with open(file=movies_path, mode="rb") as f:
+                movies = pickle.load(f)
 
-            unique_user_ids = pickle.load(unique_user_ids_path)
+            with open(file=unique_user_ids_path, mode="rb") as f:
+                unique_user_ids = pickle.load(f)
             user_model = tf.keras.Sequential(
                 [
                     tf.keras.layers.StringLookup(vocabulary=unique_user_ids, mask_token=None),
@@ -80,7 +82,8 @@ spec:
                 ]
             )
 
-            unique_movie_titles = pickle.load(unique_movie_titles_path)
+            with open(file=unique_movie_titles_path, mode="rb") as f:
+                unique_movie_titles = pickle.load(f)
             movie_model = tf.keras.Sequential(
                 [
                     tf.keras.layers.StringLookup(
@@ -116,8 +119,10 @@ spec:
             model = MovielensModel(user_model, movie_model)
             model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))
 
-            train = pickle.load(train_path)
-            test = pickle.load(test_path)
+            with open(file=train_path, mode="rb") as f:
+                train = pickle.load(f)
+            with open(file=test_path, mode="rb") as f:
+                test = pickle.load(f)
 
             cached_train = train.shuffle(100_000).batch(8192).cache()
             cached_test = test.batch(4096).cache()
@@ -148,6 +153,7 @@ spec:
 
         _outputs = build_model(**_parsed_args)
       image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+      imagePullPolicy: Always
     inputs:
       artifacts:
       - {name: prepare-dataset-movies, path: /tmp/inputs/movies/data}
@@ -174,12 +180,14 @@ spec:
           exist_ok=True)\n    return file_path\n\ndef build_model(\n    movies_path,\n    unique_user_ids_path,\n    unique_movie_titles_path,\n    train_path,\n    test_path,\n    model_path,\n):\n    \"\"\"Function
           to build model.\"\"\"\n    import pickle\n    from typing import Dict, Text\n\n    import
           tensorflow as tf\n    import tensorflow_recommenders as tfrs\n\n    embedding_dimension
-          = 32\n\n    movies = pickle.load(movies_path)\n\n    unique_user_ids = pickle.load(unique_user_ids_path)\n    user_model
-          = tf.keras.Sequential(\n        [\n            tf.keras.layers.StringLookup(vocabulary=unique_user_ids,
+          = 32\n\n    with open(file=movies_path, mode=\"rb\") as f:\n        movies
+          = pickle.load(f)\n\n    with open(file=unique_user_ids_path, mode=\"rb\")
+          as f:\n        unique_user_ids = pickle.load(f)\n    user_model = tf.keras.Sequential(\n        [\n            tf.keras.layers.StringLookup(vocabulary=unique_user_ids,
           mask_token=None),\n            # We add an additional embedding to account
           for unknown tokens.\n            tf.keras.layers.Embedding(len(unique_user_ids)
-          + 1, embedding_dimension),\n        ]\n    )\n\n    unique_movie_titles
-          = pickle.load(unique_movie_titles_path)\n    movie_model = tf.keras.Sequential(\n        [\n            tf.keras.layers.StringLookup(\n                vocabulary=unique_movie_titles,
+          + 1, embedding_dimension),\n        ]\n    )\n\n    with open(file=unique_movie_titles_path,
+          mode=\"rb\") as f:\n        unique_movie_titles = pickle.load(f)\n    movie_model
+          = tf.keras.Sequential(\n        [\n            tf.keras.layers.StringLookup(\n                vocabulary=unique_movie_titles,
           mask_token=None\n            ),\n            tf.keras.layers.Embedding(\n                len(unique_movie_titles)
           + 1, embedding_dimension\n            ),\n        ]\n    )\n    metrics
           = tfrs.metrics.FactorizedTopK(candidates=movies.batch(128).map(movie_model))\n    task
@@ -193,8 +201,9 @@ spec:
           movie features and pass them into the movie model,\n            # getting
           embeddings back.\n            positive_movie_embeddings = self.movie_model(features[\"movie_title\"])\n\n            #
           The task computes the loss and the metrics.\n            return self.task(user_embeddings,
-          positive_movie_embeddings)\n\n    model = MovielensModel(user_model, movie_model)\n    model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))\n\n    train
-          = pickle.load(train_path)\n    test = pickle.load(test_path)\n\n    cached_train
+          positive_movie_embeddings)\n\n    model = MovielensModel(user_model, movie_model)\n    model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))\n\n    with
+          open(file=train_path, mode=\"rb\") as f:\n        train = pickle.load(f)\n    with
+          open(file=test_path, mode=\"rb\") as f:\n        test = pickle.load(f)\n\n    cached_train
           = train.shuffle(100_000).batch(8192).cache()\n    cached_test = test.batch(4096).cache()\n\n    model.fit(cached_train,
           epochs=3)\n    model.evaluate(cached_test, return_dict=True)\n\n    # Create
           a model that takes in raw query features, and\n    index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)\n    #
@@ -250,7 +259,8 @@ spec:
             # Features of all the available movies.
             movies = tfds.load("movielens/100k-movies", split="train")
 
-            pickle.dump(movies, movies_path)
+            with open(file=movies_path, mode="wb") as f:
+                pickle.dump(movies, f)
 
             ratings = ratings.map(
                 lambda x: {
@@ -266,8 +276,10 @@ spec:
             train = shuffled.take(80_000)
             test = shuffled.skip(80_000).take(20_000)
 
-            pickle.dump(train, train_path)
-            pickle.dump(test, test_path)
+            with open(file=train_path, mode="wb") as f:
+                pickle.dump(train, f)
+            with open(file=test_path, mode="wb") as f:
+                pickle.dump(test, f)
 
             movie_titles = movies.batch(1_000)
             user_ids = ratings.batch(1_000_000).map(lambda x: x["user_id"])
@@ -275,8 +287,10 @@ spec:
             unique_movie_titles = np.unique(np.concatenate(list(movie_titles)))
             unique_user_ids = np.unique(np.concatenate(list(user_ids)))
 
-            pickle.dump(unique_movie_titles, unique_movie_titles_path)
-            pickle.dump(unique_user_ids, unique_user_ids_path)
+            with open(file=unique_movie_titles_path, mode="wb") as f:
+                pickle.dump(unique_movie_titles, f)
+            with open(file=unique_user_ids_path, mode="wb") as f:
+                pickle.dump(unique_user_ids, f)
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')
@@ -289,6 +303,7 @@ spec:
 
         _outputs = prepare_dataset(**_parsed_args)
       image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+      imagePullPolicy: Always
     outputs:
       artifacts:
       - {name: prepare-dataset-movies, path: /tmp/outputs/movies/data}
@@ -314,21 +329,26 @@ spec:
           tensorflow as tf\n    import tensorflow_datasets as tfds\n\n    # Ratings
           data.\n    ratings = tfds.load(\"movielens/100k-ratings\", split=\"train\")\n    #
           Features of all the available movies.\n    movies = tfds.load(\"movielens/100k-movies\",
-          split=\"train\")\n\n    pickle.dump(movies, movies_path)\n\n    ratings
-          = ratings.map(\n        lambda x: {\n            \"movie_title\": x[\"movie_title\"],\n            \"user_id\":
-          x[\"user_id\"],\n        }\n    )\n    movies = movies.map(lambda x: x[\"movie_title\"])\n\n    tf.random.set_seed(42)\n    shuffled
+          split=\"train\")\n\n    with open(file=movies_path, mode=\"wb\") as f:\n        pickle.dump(movies,
+          f)\n\n    ratings = ratings.map(\n        lambda x: {\n            \"movie_title\":
+          x[\"movie_title\"],\n            \"user_id\": x[\"user_id\"],\n        }\n    )\n    movies
+          = movies.map(lambda x: x[\"movie_title\"])\n\n    tf.random.set_seed(42)\n    shuffled
           = ratings.shuffle(100_000, seed=42, reshuffle_each_iteration=False)\n\n    train
-          = shuffled.take(80_000)\n    test = shuffled.skip(80_000).take(20_000)\n\n    pickle.dump(train,
-          train_path)\n    pickle.dump(test, test_path)\n\n    movie_titles = movies.batch(1_000)\n    user_ids
-          = ratings.batch(1_000_000).map(lambda x: x[\"user_id\"])\n\n    unique_movie_titles
-          = np.unique(np.concatenate(list(movie_titles)))\n    unique_user_ids = np.unique(np.concatenate(list(user_ids)))\n\n    pickle.dump(unique_movie_titles,
-          unique_movie_titles_path)\n    pickle.dump(unique_user_ids, unique_user_ids_path)\n\nimport
-          argparse\n_parser = argparse.ArgumentParser(prog=''Prepare dataset'', description=''Function
-          to prepare dataset.'')\n_parser.add_argument(\"--movies\", dest=\"movies_path\",
-          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--train\",
-          dest=\"train_path\", type=_make_parent_dirs_and_return_path, required=True,
-          default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\", dest=\"test_path\",
-          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
+          = shuffled.take(80_000)\n    test = shuffled.skip(80_000).take(20_000)\n\n    with
+          open(file=train_path, mode=\"wb\") as f:\n        pickle.dump(train, f)\n    with
+          open(file=test_path, mode=\"wb\") as f:\n        pickle.dump(test, f)\n\n    movie_titles
+          = movies.batch(1_000)\n    user_ids = ratings.batch(1_000_000).map(lambda
+          x: x[\"user_id\"])\n\n    unique_movie_titles = np.unique(np.concatenate(list(movie_titles)))\n    unique_user_ids
+          = np.unique(np.concatenate(list(user_ids)))\n\n    with open(file=unique_movie_titles_path,
+          mode=\"wb\") as f:\n        pickle.dump(unique_movie_titles, f)\n    with
+          open(file=unique_user_ids_path, mode=\"wb\") as f:\n        pickle.dump(unique_user_ids,
+          f)\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Prepare
+          dataset'', description=''Function to prepare dataset.'')\n_parser.add_argument(\"--movies\",
+          dest=\"movies_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parser.add_argument(\"--train\", dest=\"train_path\",
+          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
+          dest=\"test_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
           dest=\"unique_movie_titles_path\", type=_make_parent_dirs_and_return_path,
           required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-user-ids\",
           dest=\"unique_user_ids_path\", type=_make_parent_dirs_and_return_path, required=True,

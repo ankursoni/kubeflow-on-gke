@@ -24,7 +24,8 @@ def prepare_dataset(
     # Features of all the available movies.
     movies = tfds.load("movielens/100k-movies", split="train")
 
-    pickle.dump(movies, movies_path)
+    with open(file=movies_path, mode="wb") as f:
+        pickle.dump(movies, f)
 
     ratings = ratings.map(
         lambda x: {
@@ -40,8 +41,10 @@ def prepare_dataset(
     train = shuffled.take(80_000)
     test = shuffled.skip(80_000).take(20_000)
 
-    pickle.dump(train, train_path)
-    pickle.dump(test, test_path)
+    with open(file=train_path, mode="wb") as f:
+        pickle.dump(train, f)
+    with open(file=test_path, mode="wb") as f:
+        pickle.dump(test, f)
 
     movie_titles = movies.batch(1_000)
     user_ids = ratings.batch(1_000_000).map(lambda x: x["user_id"])
@@ -49,8 +52,10 @@ def prepare_dataset(
     unique_movie_titles = np.unique(np.concatenate(list(movie_titles)))
     unique_user_ids = np.unique(np.concatenate(list(user_ids)))
 
-    pickle.dump(unique_movie_titles, unique_movie_titles_path)
-    pickle.dump(unique_user_ids, unique_user_ids_path)
+    with open(file=unique_movie_titles_path, mode="wb") as f:
+        pickle.dump(unique_movie_titles, f)
+    with open(file=unique_user_ids_path, mode="wb") as f:
+        pickle.dump(unique_user_ids, f)
 
 
 prepare_dataset_op = kfp.components.create_component_from_func(
@@ -77,9 +82,11 @@ def build_model(
 
     embedding_dimension = 32
 
-    movies = pickle.load(movies_path)
+    with open(file=movies_path, mode="rb") as f:
+        movies = pickle.load(f)
 
-    unique_user_ids = pickle.load(unique_user_ids_path)
+    with open(file=unique_user_ids_path, mode="rb") as f:
+        unique_user_ids = pickle.load(f)
     user_model = tf.keras.Sequential(
         [
             tf.keras.layers.StringLookup(vocabulary=unique_user_ids, mask_token=None),
@@ -88,7 +95,8 @@ def build_model(
         ]
     )
 
-    unique_movie_titles = pickle.load(unique_movie_titles_path)
+    with open(file=unique_movie_titles_path, mode="rb") as f:
+        unique_movie_titles = pickle.load(f)
     movie_model = tf.keras.Sequential(
         [
             tf.keras.layers.StringLookup(
@@ -124,8 +132,10 @@ def build_model(
     model = MovielensModel(user_model, movie_model)
     model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))
 
-    train = pickle.load(train_path)
-    test = pickle.load(test_path)
+    with open(file=train_path, mode="rb") as f:
+        train = pickle.load(f)
+    with open(file=test_path, mode="rb") as f:
+        test = pickle.load(f)
 
     cached_train = train.shuffle(100_000).batch(8192).cache()
     cached_test = test.batch(4096).cache()
@@ -187,6 +197,7 @@ trained_files_to_gcs_op = kfp.components.create_component_from_func(
 def basic_retrieval_pipeline(gcs_bucket_name):
     """Function to run basic retrieval pipeline."""
     prepare_dataset_task = prepare_dataset_op()
+    prepare_dataset_task.container.set_image_pull_policy("Always")
     prepare_dataset_task.set_caching_options(False)
     prepare_dataset_task.execution_options.caching_strategy.max_cache_staleness = "P0D"
 
@@ -197,6 +208,7 @@ def basic_retrieval_pipeline(gcs_bucket_name):
         train=prepare_dataset_task.outputs["train"],
         test=prepare_dataset_task.outputs["test"],
     )
+    build_model_task.container.set_image_pull_policy("Always")
     build_model_task.set_caching_options(False)
     build_model_task.execution_options.caching_strategy.max_cache_staleness = "P0D"
 

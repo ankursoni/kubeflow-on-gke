@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: listwise-ranking-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-05T00:03:58.170262',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-06T04:55:59.816663',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Listwise ranking pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Listwise ranking pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
@@ -41,8 +41,10 @@ spec:
             import tensorflow_ranking as tfr
             import tensorflow_recommenders as tfrs
 
-            unique_user_ids = pickle.load(unique_user_ids_path)
-            unique_movie_titles = pickle.load(unique_movie_titles_path)
+            with open(file=unique_user_ids_path, mode="rb") as f:
+                unique_user_ids = pickle.load(f)
+            with open(file=unique_movie_titles_path, mode="rb") as f:
+                unique_movie_titles = pickle.load(f)
 
             class RankingModel(tfrs.Model):
                 def __init__(self, loss):
@@ -123,8 +125,10 @@ spec:
                         predictions=tf.squeeze(scores, axis=-1),
                     )
 
-            train = pickle.load(train_path)
-            test = pickle.load(test_path)
+            with open(file=train_path, mode="rb") as f:
+                train = pickle.load(f)
+            with open(file=test_path, mode="rb") as f:
+                test = pickle.load(f)
 
             cached_train = train.shuffle(100_000).batch(8192).cache()
             # # TODO
@@ -149,6 +153,7 @@ spec:
 
         _outputs = build_model(**_parsed_args)
       image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+      imagePullPolicy: Always
     inputs:
       artifacts:
       - {name: prepare-dataset-test, path: /tmp/inputs/test/data}
@@ -172,9 +177,11 @@ spec:
           "def _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
           exist_ok=True)\n    return file_path\n\ndef build_model(\n    unique_user_ids_path,\n    unique_movie_titles_path,\n    train_path,\n    test_path,\n    model_path,\n):\n    \"\"\"Function
           to build model.\"\"\"\n    import pickle\n\n    import tensorflow as tf\n    import
-          tensorflow_ranking as tfr\n    import tensorflow_recommenders as tfrs\n\n    unique_user_ids
-          = pickle.load(unique_user_ids_path)\n    unique_movie_titles = pickle.load(unique_movie_titles_path)\n\n    class
-          RankingModel(tfrs.Model):\n        def __init__(self, loss):\n            super().__init__()\n            embedding_dimension
+          tensorflow_ranking as tfr\n    import tensorflow_recommenders as tfrs\n\n    with
+          open(file=unique_user_ids_path, mode=\"rb\") as f:\n        unique_user_ids
+          = pickle.load(f)\n    with open(file=unique_movie_titles_path, mode=\"rb\")
+          as f:\n        unique_movie_titles = pickle.load(f)\n\n    class RankingModel(tfrs.Model):\n        def
+          __init__(self, loss):\n            super().__init__()\n            embedding_dimension
           = 32\n\n            # Compute embeddings for users.\n            self.user_embeddings
           = tf.keras.Sequential(\n                [\n                    tf.keras.layers.StringLookup(vocabulary=unique_user_ids),\n                    tf.keras.layers.Embedding(\n                        len(unique_user_ids)
           + 2, embedding_dimension\n                    ),\n                ]\n            )\n\n            #
@@ -201,8 +208,9 @@ spec:
           2\n            )\n\n            return self.score_model(concatenated_embeddings)\n\n        def
           compute_loss(self, features, training=False):\n            labels = features.pop(\"user_rating\")\n\n            scores
           = self(features)\n\n            return self.task(\n                labels=labels,\n                predictions=tf.squeeze(scores,
-          axis=-1),\n            )\n\n    train = pickle.load(train_path)\n    test
-          = pickle.load(test_path)\n\n    cached_train = train.shuffle(100_000).batch(8192).cache()\n    #
+          axis=-1),\n            )\n\n    with open(file=train_path, mode=\"rb\")
+          as f:\n        train = pickle.load(f)\n    with open(file=test_path, mode=\"rb\")
+          as f:\n        test = pickle.load(f)\n\n    cached_train = train.shuffle(100_000).batch(8192).cache()\n    #
           # TODO\n    # cached_test = test.batch(4096).cache()\n\n    listwise_model
           = RankingModel(tfr.keras.losses.ListMLELoss())\n    listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))\n\n    epochs
           = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    tf.saved_model.save(listwise_model,
@@ -290,8 +298,10 @@ spec:
                 np.concatenate(list(ratings.batch(1_000).map(lambda x: x["user_id"])))
             )
 
-            pickle.dump(unique_movie_titles, unique_movie_titles_path)
-            pickle.dump(unique_user_ids, unique_user_ids_path)
+            with open(file=unique_movie_titles_path, mode="wb") as f:
+                pickle.dump(unique_movie_titles, f)
+            with open(file=unique_user_ids_path, mode="wb") as f:
+                pickle.dump(unique_user_ids, f)
 
             tf.random.set_seed(42)
 
@@ -310,8 +320,10 @@ spec:
                 test, num_list_per_user=1, num_examples_per_list=5, seed=42
             )
 
-            pickle.dump(train, train_path)
-            pickle.dump(test, test_path)
+            with open(file=train_path, mode="wb") as f:
+                pickle.dump(train, f)
+            with open(file=test_path, mode="wb") as f:
+                pickle.dump(test, f)
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')
@@ -323,6 +335,7 @@ spec:
 
         _outputs = prepare_dataset(**_parsed_args)
       image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
+      imagePullPolicy: Always
     outputs:
       artifacts:
       - {name: prepare-dataset-test, path: /tmp/outputs/test/data}
@@ -351,21 +364,24 @@ spec:
           = movies.map(lambda x: x[\"movie_title\"])\n\n    unique_movie_titles =
           np.unique(np.concatenate(list(movies.batch(1000))))\n    unique_user_ids
           = np.unique(\n        np.concatenate(list(ratings.batch(1_000).map(lambda
-          x: x[\"user_id\"])))\n    )\n\n    pickle.dump(unique_movie_titles, unique_movie_titles_path)\n    pickle.dump(unique_user_ids,
-          unique_user_ids_path)\n\n    tf.random.set_seed(42)\n\n    # Split between
-          train and tests sets, as before.\n    shuffled = ratings.shuffle(100_000,
-          seed=42, reshuffle_each_iteration=False)\n\n    train = shuffled.take(80_000)\n    test
-          = shuffled.skip(80_000).take(20_000)\n\n    # We sample 50 lists for each
-          user for the training data. For each list we\n    # sample 5 movies from
-          the movies the user rated.\n    train = tfrs.examples.movielens.sample_listwise(\n        train,
+          x: x[\"user_id\"])))\n    )\n\n    with open(file=unique_movie_titles_path,
+          mode=\"wb\") as f:\n        pickle.dump(unique_movie_titles, f)\n    with
+          open(file=unique_user_ids_path, mode=\"wb\") as f:\n        pickle.dump(unique_user_ids,
+          f)\n\n    tf.random.set_seed(42)\n\n    # Split between train and tests
+          sets, as before.\n    shuffled = ratings.shuffle(100_000, seed=42, reshuffle_each_iteration=False)\n\n    train
+          = shuffled.take(80_000)\n    test = shuffled.skip(80_000).take(20_000)\n\n    #
+          We sample 50 lists for each user for the training data. For each list we\n    #
+          sample 5 movies from the movies the user rated.\n    train = tfrs.examples.movielens.sample_listwise(\n        train,
           num_list_per_user=50, num_examples_per_list=5, seed=42\n    )\n    test
           = tfrs.examples.movielens.sample_listwise(\n        test, num_list_per_user=1,
-          num_examples_per_list=5, seed=42\n    )\n\n    pickle.dump(train, train_path)\n    pickle.dump(test,
-          test_path)\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Prepare
-          dataset'', description=''Function to prepare dataset.'')\n_parser.add_argument(\"--train\",
-          dest=\"train_path\", type=_make_parent_dirs_and_return_path, required=True,
-          default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\", dest=\"test_path\",
-          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
+          num_examples_per_list=5, seed=42\n    )\n\n    with open(file=train_path,
+          mode=\"wb\") as f:\n        pickle.dump(train, f)\n    with open(file=test_path,
+          mode=\"wb\") as f:\n        pickle.dump(test, f)\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Prepare dataset'', description=''Function
+          to prepare dataset.'')\n_parser.add_argument(\"--train\", dest=\"train_path\",
+          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
+          dest=\"test_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
           dest=\"unique_movie_titles_path\", type=_make_parent_dirs_and_return_path,
           required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-user-ids\",
           dest=\"unique_user_ids_path\", type=_make_parent_dirs_and_return_path, required=True,

@@ -52,8 +52,10 @@ implementation:
               np.concatenate(list(ratings.batch(1_000).map(lambda x: x["user_id"])))
           )
 
-          pickle.dump(unique_movie_titles, unique_movie_titles_path)
-          pickle.dump(unique_user_ids, unique_user_ids_path)
+          with open(file=unique_movie_titles_path, mode="wb") as f:
+              pickle.dump(unique_movie_titles, f)
+          with open(file=unique_user_ids_path, mode="wb") as f:
+              pickle.dump(unique_user_ids, f)
 
           tf.random.set_seed(42)
 
@@ -72,8 +74,10 @@ implementation:
               test, num_list_per_user=1, num_examples_per_list=5, seed=42
           )
 
-          pickle.dump(train, train_path)
-          pickle.dump(test, test_path)
+          with open(file=train_path, mode="wb") as f:
+              pickle.dump(train, f)
+          with open(file=test_path, mode="wb") as f:
+              pickle.dump(test, f)
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')

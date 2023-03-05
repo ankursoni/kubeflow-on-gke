@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: hello-world-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-04T21:48:13.453085',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-06T06:17:13.258284',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Hello world pipeline",
       "inputs": [{"name": "user_name"}, {"name": "gcs_bucket_name"}, {"name": "file_name"}],
       "name": "Hello world pipeline"}'}
@@ -124,6 +124,7 @@ spec:
 
         _outputs = say_hello(**_parsed_args)
       image: python:3.10.9-slim-buster
+      imagePullPolicy: Always
     inputs:
       parameters:
       - {name: user_name}
