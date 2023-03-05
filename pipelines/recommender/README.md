@@ -6,6 +6,7 @@ References:
 - https://istio.io/latest/docs/setup/install/helm/
 - https://docs.seldon.io/projects/seldon-core/en/latest/workflow/install.html
 - https://docs.seldon.io/projects/seldon-core/en/latest/ingress/istio.html
+- https://istio.io/latest/docs/tasks/traffic-management/ingress/ingress-control/
 - https://www.kubeflow.org/docs/external-add-ons/serving/seldon/#seldon-serving
 ```shell
 # install istio
@@ -37,8 +38,11 @@ helm install seldon-core seldon-core-operator \
 kubectl create namespace seldon
 kubectl label namespace seldon serving.kubeflow.org/inferenceservice=enabled
 
-# run simple example on seldon
+# install seldon gateway running on port 80
 cd pipelines/recommender
+kubectl create -f seldon_gateway.yaml
+
+# run simple example on seldon
 kubectl create -n seldon -f seldon_simple_example.yaml
 ```
 
