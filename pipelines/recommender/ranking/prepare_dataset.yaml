@@ -74,10 +74,8 @@ implementation:
               test, num_list_per_user=1, num_examples_per_list=5, seed=42
           )
 
-          with open(file=train_path, mode="wb") as f:
-              pickle.dump(train, f)
-          with open(file=test_path, mode="wb") as f:
-              pickle.dump(test, f)
+          train.save(train_path)
+          test.save(test_path)
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')

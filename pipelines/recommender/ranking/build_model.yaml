@@ -121,14 +121,11 @@ implementation:
                       predictions=tf.squeeze(scores, axis=-1),
                   )
 
-          with open(file=train_path, mode="rb") as f:
-              train = pickle.load(f)
-          with open(file=test_path, mode="rb") as f:
-              test = pickle.load(f)
+          train = tf.data.Dataset.load(train_path)
+          test = tf.data.Dataset.load(test_path)
 
           cached_train = train.shuffle(100_000).batch(8192).cache()
-          # # TODO
-          # cached_test = test.batch(4096).cache()
+          cached_test = test.batch(4096).cache()
 
           listwise_model = RankingModel(tfr.keras.losses.ListMLELoss())
           listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))
@@ -136,7 +133,8 @@ implementation:
           epochs = 1
           listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-          tf.saved_model.save(listwise_model, f"{model_path}")
+          with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
+              listwise_model.save_weights(f)
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')

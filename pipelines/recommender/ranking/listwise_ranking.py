@@ -58,10 +58,8 @@ def prepare_dataset(
         test, num_list_per_user=1, num_examples_per_list=5, seed=42
     )
 
-    with open(file=train_path, mode="wb") as f:
-        pickle.dump(train, f)
-    with open(file=test_path, mode="wb") as f:
-        pickle.dump(test, f)
+    train.save(train_path)
+    test.save(test_path)
 
 
 prepare_dataset_op = kfp.components.create_component_from_func(
@@ -169,14 +167,11 @@ def build_model(
                 predictions=tf.squeeze(scores, axis=-1),
             )
 
-    with open(file=train_path, mode="rb") as f:
-        train = pickle.load(f)
-    with open(file=test_path, mode="rb") as f:
-        test = pickle.load(f)
+    train = tf.data.Dataset.load(train_path)
+    test = tf.data.Dataset.load(test_path)
 
     cached_train = train.shuffle(100_000).batch(8192).cache()
-    # # TODO
-    # cached_test = test.batch(4096).cache()
+    cached_test = test.batch(4096).cache()
 
     listwise_model = RankingModel(tfr.keras.losses.ListMLELoss())
     listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))
@@ -184,7 +179,8 @@ def build_model(
     epochs = 1
     listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-    tf.saved_model.save(listwise_model, f"{model_path}")
+    with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
+        listwise_model.save_weights(f)
 
 
 build_model_op = kfp.components.create_component_from_func(
@@ -208,8 +204,8 @@ def trained_files_to_gcs(
     client = storage.Client()
     bucket = client.bucket(gcs_bucket_name)
 
-    with open(file=f"{model_path}/listwise_ranking_model.h5", mode="rb") as file:
-        blob = bucket.blob("listwise_ranking_model.h5")
+    with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="rb") as file:
+        blob = bucket.blob("listwise_ranking_model_weights.h5")
         blob.upload_from_file(file, content_type="bytes")
 
     return True

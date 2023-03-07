@@ -24,8 +24,7 @@ def prepare_dataset(
     # Features of all the available movies.
     movies = tfds.load("movielens/100k-movies", split="train")
 
-    with open(file=movies_path, mode="wb") as f:
-        pickle.dump(movies, f)
+    movies.save(movies_path)
 
     ratings = ratings.map(
         lambda x: {
@@ -41,10 +40,8 @@ def prepare_dataset(
     train = shuffled.take(80_000)
     test = shuffled.skip(80_000).take(20_000)
 
-    with open(file=train_path, mode="wb") as f:
-        pickle.dump(train, f)
-    with open(file=test_path, mode="wb") as f:
-        pickle.dump(test, f)
+    train.save(train_path)
+    test.save(test_path)
 
     movie_titles = movies.batch(1_000)
     user_ids = ratings.batch(1_000_000).map(lambda x: x["user_id"])
@@ -82,8 +79,7 @@ def build_model(
 
     embedding_dimension = 32
 
-    with open(file=movies_path, mode="rb") as f:
-        movies = pickle.load(f)
+    movies = tf.data.Dataset.load(movies_path)
 
     with open(file=unique_user_ids_path, mode="rb") as f:
         unique_user_ids = pickle.load(f)
@@ -132,10 +128,8 @@ def build_model(
     model = MovielensModel(user_model, movie_model)
     model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))
 
-    with open(file=train_path, mode="rb") as f:
-        train = pickle.load(f)
-    with open(file=test_path, mode="rb") as f:
-        test = pickle.load(f)
+    train = tf.data.Dataset.load(train_path)
+    test = tf.data.Dataset.load(test_path)
 
     cached_train = train.shuffle(100_000).batch(8192).cache()
     cached_test = test.batch(4096).cache()

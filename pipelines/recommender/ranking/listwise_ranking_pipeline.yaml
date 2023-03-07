@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: listwise-ranking-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-07T09:55:04.224460',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-07T13:06:30.540386',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Listwise ranking pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Listwise ranking pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
@@ -125,14 +125,11 @@ spec:
                         predictions=tf.squeeze(scores, axis=-1),
                     )
 
-            with open(file=train_path, mode="rb") as f:
-                train = pickle.load(f)
-            with open(file=test_path, mode="rb") as f:
-                test = pickle.load(f)
+            train = tf.data.Dataset.load(train_path)
+            test = tf.data.Dataset.load(test_path)
 
             cached_train = train.shuffle(100_000).batch(8192).cache()
-            # # TODO
-            # cached_test = test.batch(4096).cache()
+            cached_test = test.batch(4096).cache()
 
             listwise_model = RankingModel(tfr.keras.losses.ListMLELoss())
             listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))
@@ -140,7 +137,8 @@ spec:
             epochs = 1
             listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-            tf.saved_model.save(listwise_model, f"{model_path}")
+            with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
+                listwise_model.save_weights(f)
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
@@ -208,15 +206,15 @@ spec:
           2\n            )\n\n            return self.score_model(concatenated_embeddings)\n\n        def
           compute_loss(self, features, training=False):\n            labels = features.pop(\"user_rating\")\n\n            scores
           = self(features)\n\n            return self.task(\n                labels=labels,\n                predictions=tf.squeeze(scores,
-          axis=-1),\n            )\n\n    with open(file=train_path, mode=\"rb\")
-          as f:\n        train = pickle.load(f)\n    with open(file=test_path, mode=\"rb\")
-          as f:\n        test = pickle.load(f)\n\n    cached_train = train.shuffle(100_000).batch(8192).cache()\n    #
-          # TODO\n    # cached_test = test.batch(4096).cache()\n\n    listwise_model
-          = RankingModel(tfr.keras.losses.ListMLELoss())\n    listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))\n\n    epochs
-          = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    tf.saved_model.save(listwise_model,
-          f\"{model_path}\")\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Build
-          model'', description=''Function to build model.'')\n_parser.add_argument(\"--unique-user-ids\",
-          dest=\"unique_user_ids_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
+          axis=-1),\n            )\n\n    train = tf.data.Dataset.load(train_path)\n    test
+          = tf.data.Dataset.load(test_path)\n\n    cached_train = train.shuffle(100_000).batch(8192).cache()\n    cached_test
+          = test.batch(4096).cache()\n\n    listwise_model = RankingModel(tfr.keras.losses.ListMLELoss())\n    listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))\n\n    epochs
+          = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    with
+          open(file=f\"{model_path}/listwise_ranking_model_weights.h5\", mode=\"w+\")
+          as f:\n        listwise_model.save_weights(f)\n\nimport argparse\n_parser
+          = argparse.ArgumentParser(prog=''Build model'', description=''Function to
+          build model.'')\n_parser.add_argument(\"--unique-user-ids\", dest=\"unique_user_ids_path\",
+          type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
           dest=\"unique_movie_titles_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--train\",
           dest=\"train_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
           dest=\"test_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model\",
@@ -320,10 +318,8 @@ spec:
                 test, num_list_per_user=1, num_examples_per_list=5, seed=42
             )
 
-            with open(file=train_path, mode="wb") as f:
-                pickle.dump(train, f)
-            with open(file=test_path, mode="wb") as f:
-                pickle.dump(test, f)
+            train.save(train_path)
+            test.save(test_path)
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')
@@ -374,10 +370,8 @@ spec:
           sample 5 movies from the movies the user rated.\n    train = tfrs.examples.movielens.sample_listwise(\n        train,
           num_list_per_user=50, num_examples_per_list=5, seed=42\n    )\n    test
           = tfrs.examples.movielens.sample_listwise(\n        test, num_list_per_user=1,
-          num_examples_per_list=5, seed=42\n    )\n\n    with open(file=train_path,
-          mode=\"wb\") as f:\n        pickle.dump(train, f)\n    with open(file=test_path,
-          mode=\"wb\") as f:\n        pickle.dump(test, f)\n\nimport argparse\n_parser
-          = argparse.ArgumentParser(prog=''Prepare dataset'', description=''Function
+          num_examples_per_list=5, seed=42\n    )\n\n    train.save(train_path)\n    test.save(test_path)\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Prepare dataset'', description=''Function
           to prepare dataset.'')\n_parser.add_argument(\"--train\", dest=\"train_path\",
           type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
           dest=\"test_path\", type=_make_parent_dirs_and_return_path, required=True,
@@ -416,8 +410,8 @@ spec:
             client = storage.Client()
             bucket = client.bucket(gcs_bucket_name)
 
-            with open(file=f"{model_path}/listwise_ranking_model.h5", mode="rb") as file:
-                blob = bucket.blob("listwise_ranking_model.h5")
+            with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="rb") as file:
+                blob = bucket.blob("listwise_ranking_model_weights.h5")
                 blob.upload_from_file(file, content_type="bytes")
 
             return True
@@ -479,8 +473,8 @@ spec:
           bool,\n    gcs_bucket_name,\n    model_path,\n):\n    \"\"\"Function to
           upload training output to gcs bucket.\"\"\"\n    from google.cloud import
           storage\n\n    # if not test_result:\n    #     return\n\n    client = storage.Client()\n    bucket
-          = client.bucket(gcs_bucket_name)\n\n    with open(file=f\"{model_path}/listwise_ranking_model.h5\",
-          mode=\"rb\") as file:\n        blob = bucket.blob(\"listwise_ranking_model.h5\")\n        blob.upload_from_file(file,
+          = client.bucket(gcs_bucket_name)\n\n    with open(file=f\"{model_path}/listwise_ranking_model_weights.h5\",
+          mode=\"rb\") as file:\n        blob = bucket.blob(\"listwise_ranking_model_weights.h5\")\n        blob.upload_from_file(file,
           content_type=\"bytes\")\n\n    return True\n\ndef _serialize_bool(bool_value:
           bool) -> str:\n    if isinstance(bool_value, str):\n        return bool_value\n    if
           not isinstance(bool_value, bool):\n        raise TypeError(''Value \"{}\"
