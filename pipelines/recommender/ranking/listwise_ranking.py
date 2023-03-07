@@ -58,8 +58,8 @@ def prepare_dataset(
         test, num_list_per_user=1, num_examples_per_list=5, seed=42
     )
 
-    train.save(train_path)
-    test.save(test_path)
+    train.save(train_path, compression="GZIP")
+    test.save(test_path, compression="GZIP")
 
 
 prepare_dataset_op = kfp.components.create_component_from_func(
@@ -167,8 +167,8 @@ def build_model(
                 predictions=tf.squeeze(scores, axis=-1),
             )
 
-    train = tf.data.Dataset.load(train_path)
-    test = tf.data.Dataset.load(test_path)
+    train = tf.data.Dataset.load(train_path, compression="GZIP")
+    test = tf.data.Dataset.load(test_path, compression="GZIP")
 
     cached_train = train.shuffle(100_000).batch(8192).cache()
     cached_test = test.batch(4096).cache()
@@ -179,8 +179,7 @@ def build_model(
     epochs = 1
     listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-    with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
-        listwise_model.save_weights(f)
+    listwise_model.save_weights(f"{model_path}/listwise_ranking_model_weights.h5")
 
 
 build_model_op = kfp.components.create_component_from_func(

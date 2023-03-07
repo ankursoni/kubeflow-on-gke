@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: basic-retrieval-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-07T12:08:13.105209',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-07T21:02:34.116240',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Basic retrieval pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Basic retrieval pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
@@ -69,7 +69,7 @@ spec:
 
             embedding_dimension = 32
 
-            movies = tf.data.Dataset.load(movies_path)
+            movies = tf.data.Dataset.load(movies_path, compression="GZIP")
 
             with open(file=unique_user_ids_path, mode="rb") as f:
                 unique_user_ids = pickle.load(f)
@@ -118,8 +118,8 @@ spec:
             model = MovielensModel(user_model, movie_model)
             model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))
 
-            train = tf.data.Dataset.load(train_path)
-            test = tf.data.Dataset.load(test_path)
+            train = tf.data.Dataset.load(train_path, compression="GZIP")
+            test = tf.data.Dataset.load(test_path, compression="GZIP")
 
             cached_train = train.shuffle(100_000).batch(8192).cache()
             cached_test = test.batch(4096).cache()
@@ -177,9 +177,9 @@ spec:
           exist_ok=True)\n    return file_path\n\ndef build_model(\n    movies_path,\n    unique_user_ids_path,\n    unique_movie_titles_path,\n    train_path,\n    test_path,\n    model_path,\n):\n    \"\"\"Function
           to build model.\"\"\"\n    import pickle\n    from typing import Dict, Text\n\n    import
           tensorflow as tf\n    import tensorflow_recommenders as tfrs\n\n    embedding_dimension
-          = 32\n\n    movies = tf.data.Dataset.load(movies_path)\n\n    with open(file=unique_user_ids_path,
-          mode=\"rb\") as f:\n        unique_user_ids = pickle.load(f)\n    user_model
-          = tf.keras.Sequential(\n        [\n            tf.keras.layers.StringLookup(vocabulary=unique_user_ids,
+          = 32\n\n    movies = tf.data.Dataset.load(movies_path, compression=\"GZIP\")\n\n    with
+          open(file=unique_user_ids_path, mode=\"rb\") as f:\n        unique_user_ids
+          = pickle.load(f)\n    user_model = tf.keras.Sequential(\n        [\n            tf.keras.layers.StringLookup(vocabulary=unique_user_ids,
           mask_token=None),\n            # We add an additional embedding to account
           for unknown tokens.\n            tf.keras.layers.Embedding(len(unique_user_ids)
           + 1, embedding_dimension),\n        ]\n    )\n\n    with open(file=unique_movie_titles_path,
@@ -199,10 +199,11 @@ spec:
           embeddings back.\n            positive_movie_embeddings = self.movie_model(features[\"movie_title\"])\n\n            #
           The task computes the loss and the metrics.\n            return self.task(user_embeddings,
           positive_movie_embeddings)\n\n    model = MovielensModel(user_model, movie_model)\n    model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))\n\n    train
-          = tf.data.Dataset.load(train_path)\n    test = tf.data.Dataset.load(test_path)\n\n    cached_train
-          = train.shuffle(100_000).batch(8192).cache()\n    cached_test = test.batch(4096).cache()\n\n    model.fit(cached_train,
-          epochs=3)\n    model.evaluate(cached_test, return_dict=True)\n\n    # Create
-          a model that takes in raw query features, and\n    index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)\n    #
+          = tf.data.Dataset.load(train_path, compression=\"GZIP\")\n    test = tf.data.Dataset.load(test_path,
+          compression=\"GZIP\")\n\n    cached_train = train.shuffle(100_000).batch(8192).cache()\n    cached_test
+          = test.batch(4096).cache()\n\n    model.fit(cached_train, epochs=3)\n    model.evaluate(cached_test,
+          return_dict=True)\n\n    # Create a model that takes in raw query features,
+          and\n    index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)\n    #
           recommends movies out of the entire movies dataset.\n    index.index_from_dataset(\n        tf.data.Dataset.zip(\n            (movies.batch(100),
           movies.batch(100).map(model.movie_model))\n        )\n    )\n\n    model.save(f\"{model_path}/basic_retrieval_model.h5\")\n\nimport
           argparse\n_parser = argparse.ArgumentParser(prog=''Build model'', description=''Function
@@ -255,7 +256,7 @@ spec:
             # Features of all the available movies.
             movies = tfds.load("movielens/100k-movies", split="train")
 
-            movies.save(movies_path)
+            movies.save(movies_path, compression="GZIP")
 
             ratings = ratings.map(
                 lambda x: {
@@ -271,8 +272,8 @@ spec:
             train = shuffled.take(80_000)
             test = shuffled.skip(80_000).take(20_000)
 
-            train.save(train_path)
-            test.save(test_path)
+            train.save(train_path, compression="GZIP")
+            test.save(test_path, compression="GZIP")
 
             movie_titles = movies.batch(1_000)
             user_ids = ratings.batch(1_000_000).map(lambda x: x["user_id"])
@@ -322,11 +323,12 @@ spec:
           tensorflow as tf\n    import tensorflow_datasets as tfds\n\n    # Ratings
           data.\n    ratings = tfds.load(\"movielens/100k-ratings\", split=\"train\")\n    #
           Features of all the available movies.\n    movies = tfds.load(\"movielens/100k-movies\",
-          split=\"train\")\n\n    movies.save(movies_path)\n\n    ratings = ratings.map(\n        lambda
-          x: {\n            \"movie_title\": x[\"movie_title\"],\n            \"user_id\":
+          split=\"train\")\n\n    movies.save(movies_path, compression=\"GZIP\")\n\n    ratings
+          = ratings.map(\n        lambda x: {\n            \"movie_title\": x[\"movie_title\"],\n            \"user_id\":
           x[\"user_id\"],\n        }\n    )\n    movies = movies.map(lambda x: x[\"movie_title\"])\n\n    tf.random.set_seed(42)\n    shuffled
           = ratings.shuffle(100_000, seed=42, reshuffle_each_iteration=False)\n\n    train
-          = shuffled.take(80_000)\n    test = shuffled.skip(80_000).take(20_000)\n\n    train.save(train_path)\n    test.save(test_path)\n\n    movie_titles
+          = shuffled.take(80_000)\n    test = shuffled.skip(80_000).take(20_000)\n\n    train.save(train_path,
+          compression=\"GZIP\")\n    test.save(test_path, compression=\"GZIP\")\n\n    movie_titles
           = movies.batch(1_000)\n    user_ids = ratings.batch(1_000_000).map(lambda
           x: x[\"user_id\"])\n\n    unique_movie_titles = np.unique(np.concatenate(list(movie_titles)))\n    unique_user_ids
           = np.unique(np.concatenate(list(user_ids)))\n\n    with open(file=unique_movie_titles_path,

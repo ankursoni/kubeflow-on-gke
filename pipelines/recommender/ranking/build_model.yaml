@@ -121,8 +121,8 @@ implementation:
                       predictions=tf.squeeze(scores, axis=-1),
                   )
 
-          train = tf.data.Dataset.load(train_path)
-          test = tf.data.Dataset.load(test_path)
+          train = tf.data.Dataset.load(train_path, compression="GZIP")
+          test = tf.data.Dataset.load(test_path, compression="GZIP")
 
           cached_train = train.shuffle(100_000).batch(8192).cache()
           cached_test = test.batch(4096).cache()
@@ -133,8 +133,8 @@ implementation:
           epochs = 1
           listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-          with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
-              listwise_model.save_weights(f)
+          # with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
+          listwise_model.save_weights(f"{model_path}/listwise_ranking_model_weights.h5")
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')

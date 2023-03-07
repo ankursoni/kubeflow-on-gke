@@ -41,7 +41,7 @@ implementation:
 
           embedding_dimension = 32
 
-          movies = tf.data.Dataset.load(movies_path)
+          movies = tf.data.Dataset.load(movies_path, compression="GZIP")
 
           with open(file=unique_user_ids_path, mode="rb") as f:
               unique_user_ids = pickle.load(f)
@@ -90,8 +90,8 @@ implementation:
           model = MovielensModel(user_model, movie_model)
           model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))
 
-          train = tf.data.Dataset.load(train_path)
-          test = tf.data.Dataset.load(test_path)
+          train = tf.data.Dataset.load(train_path, compression="GZIP")
+          test = tf.data.Dataset.load(test_path, compression="GZIP")
 
           cached_train = train.shuffle(100_000).batch(8192).cache()
           cached_test = test.batch(4096).cache()

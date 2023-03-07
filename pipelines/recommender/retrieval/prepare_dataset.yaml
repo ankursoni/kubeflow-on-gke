@@ -41,7 +41,7 @@ implementation:
           # Features of all the available movies.
           movies = tfds.load("movielens/100k-movies", split="train")
 
-          movies.save(movies_path)
+          movies.save(movies_path, compression="GZIP")
 
           ratings = ratings.map(
               lambda x: {
@@ -57,8 +57,8 @@ implementation:
           train = shuffled.take(80_000)
           test = shuffled.skip(80_000).take(20_000)
 
-          train.save(train_path)
-          test.save(test_path)
+          train.save(train_path, compression="GZIP")
+          test.save(test_path, compression="GZIP")
 
           movie_titles = movies.batch(1_000)
           user_ids = ratings.batch(1_000_000).map(lambda x: x["user_id"])

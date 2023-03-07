@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: listwise-ranking-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-07T13:06:30.540386',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-07T20:58:55.993008',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Listwise ranking pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Listwise ranking pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
@@ -125,8 +125,8 @@ spec:
                         predictions=tf.squeeze(scores, axis=-1),
                     )
 
-            train = tf.data.Dataset.load(train_path)
-            test = tf.data.Dataset.load(test_path)
+            train = tf.data.Dataset.load(train_path, compression="GZIP")
+            test = tf.data.Dataset.load(test_path, compression="GZIP")
 
             cached_train = train.shuffle(100_000).batch(8192).cache()
             cached_test = test.batch(4096).cache()
@@ -137,8 +137,8 @@ spec:
             epochs = 1
             listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-            with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
-                listwise_model.save_weights(f)
+            # with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
+            listwise_model.save_weights(f"{model_path}/listwise_ranking_model_weights.h5")
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
@@ -206,14 +206,15 @@ spec:
           2\n            )\n\n            return self.score_model(concatenated_embeddings)\n\n        def
           compute_loss(self, features, training=False):\n            labels = features.pop(\"user_rating\")\n\n            scores
           = self(features)\n\n            return self.task(\n                labels=labels,\n                predictions=tf.squeeze(scores,
-          axis=-1),\n            )\n\n    train = tf.data.Dataset.load(train_path)\n    test
-          = tf.data.Dataset.load(test_path)\n\n    cached_train = train.shuffle(100_000).batch(8192).cache()\n    cached_test
-          = test.batch(4096).cache()\n\n    listwise_model = RankingModel(tfr.keras.losses.ListMLELoss())\n    listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))\n\n    epochs
-          = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    with
-          open(file=f\"{model_path}/listwise_ranking_model_weights.h5\", mode=\"w+\")
-          as f:\n        listwise_model.save_weights(f)\n\nimport argparse\n_parser
-          = argparse.ArgumentParser(prog=''Build model'', description=''Function to
-          build model.'')\n_parser.add_argument(\"--unique-user-ids\", dest=\"unique_user_ids_path\",
+          axis=-1),\n            )\n\n    train = tf.data.Dataset.load(train_path,
+          compression=\"GZIP\")\n    test = tf.data.Dataset.load(test_path, compression=\"GZIP\")\n\n    cached_train
+          = train.shuffle(100_000).batch(8192).cache()\n    cached_test = test.batch(4096).cache()\n\n    listwise_model
+          = RankingModel(tfr.keras.losses.ListMLELoss())\n    listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))\n\n    epochs
+          = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    #
+          with open(file=f\"{model_path}/listwise_ranking_model_weights.h5\", mode=\"w+\")
+          as f:\n    listwise_model.save_weights(f\"{model_path}/listwise_ranking_model_weights.h5\")\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Build model'', description=''Function
+          to build model.'')\n_parser.add_argument(\"--unique-user-ids\", dest=\"unique_user_ids_path\",
           type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
           dest=\"unique_movie_titles_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--train\",
           dest=\"train_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
@@ -318,8 +319,8 @@ spec:
                 test, num_list_per_user=1, num_examples_per_list=5, seed=42
             )
 
-            train.save(train_path)
-            test.save(test_path)
+            train.save(train_path, compression="GZIP")
+            test.save(test_path, compression="GZIP")
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')
@@ -370,12 +371,12 @@ spec:
           sample 5 movies from the movies the user rated.\n    train = tfrs.examples.movielens.sample_listwise(\n        train,
           num_list_per_user=50, num_examples_per_list=5, seed=42\n    )\n    test
           = tfrs.examples.movielens.sample_listwise(\n        test, num_list_per_user=1,
-          num_examples_per_list=5, seed=42\n    )\n\n    train.save(train_path)\n    test.save(test_path)\n\nimport
-          argparse\n_parser = argparse.ArgumentParser(prog=''Prepare dataset'', description=''Function
-          to prepare dataset.'')\n_parser.add_argument(\"--train\", dest=\"train_path\",
-          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
-          dest=\"test_path\", type=_make_parent_dirs_and_return_path, required=True,
-          default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
+          num_examples_per_list=5, seed=42\n    )\n\n    train.save(train_path, compression=\"GZIP\")\n    test.save(test_path,
+          compression=\"GZIP\")\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Prepare
+          dataset'', description=''Function to prepare dataset.'')\n_parser.add_argument(\"--train\",
+          dest=\"train_path\", type=_make_parent_dirs_and_return_path, required=True,
+          default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\", dest=\"test_path\",
+          type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
           dest=\"unique_movie_titles_path\", type=_make_parent_dirs_and_return_path,
           required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-user-ids\",
           dest=\"unique_user_ids_path\", type=_make_parent_dirs_and_return_path, required=True,

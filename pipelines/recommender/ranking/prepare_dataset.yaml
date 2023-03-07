@@ -74,8 +74,8 @@ implementation:
               test, num_list_per_user=1, num_examples_per_list=5, seed=42
           )
 
-          train.save(train_path)
-          test.save(test_path)
+          train.save(train_path, compression="GZIP")
+          test.save(test_path, compression="GZIP")
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Prepare dataset', description='Function to prepare dataset.')
