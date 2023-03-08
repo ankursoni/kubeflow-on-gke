@@ -255,9 +255,35 @@ kfp.compiler.Compiler().compile(
 )
 
 client = kfp.Client(host="http://localhost:3000")
-client.create_run_from_pipeline_func(
-    listwise_ranking_pipeline,
-    arguments={
-        "gcs_bucket_name": f"{os.environ.get('GCS_STORAGE_BUCKET_NAME')}",
-    },
+
+try:
+    client.upload_pipeline(
+        pipeline_package_path="listwise_ranking_pipeline.yaml",
+        pipeline_name="ranking",
+        description="ranking pipeline"
+    )
+except: 
+    version = client.upload_pipeline_version(
+        pipeline_package_path="listwise_ranking_pipeline.yaml",
+        pipeline_version_name="004",
+        pipeline_name="ranking",
+        description="ranking pipeline"
+    )
+
+experiment = client.create_experiment(
+    name="ranking experiment",
 )
+
+client.create_recurring_run(
+    experiment_id=experiment.id,
+    job_name="ranking every hour",
+    interval_second=3600,
+    version_id=version.id
+)
+
+#client.create_run_from_pipeline_func(
+#    listwise_ranking_pipeline,
+#    arguments={
+#        "gcs_bucket_name": f"{os.environ.get('GCS_STORAGE_BUCKET_NAME')}",
+#    },
+#)

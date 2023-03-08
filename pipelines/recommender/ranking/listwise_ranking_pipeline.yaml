@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: listwise-ranking-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-08T21:35:57.971308',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-08T21:46:02.456077',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Listwise ranking pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Listwise ranking pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
