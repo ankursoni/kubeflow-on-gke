@@ -133,8 +133,7 @@ implementation:
           epochs = 1
           listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-          # with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
-          listwise_model.save_weights(f"{model_path}/listwise_ranking_model_weights.h5")
+          listwise_model.save_weights(f"{model_path}", save_format='h5')
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')

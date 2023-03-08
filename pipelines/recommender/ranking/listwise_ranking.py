@@ -179,7 +179,7 @@ def build_model(
     epochs = 1
     listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-    listwise_model.save_weights(f"{model_path}/listwise_ranking_model_weights.h5")
+    listwise_model.save_weights(f"{model_path}", save_format='h5')
 
 
 build_model_op = kfp.components.create_component_from_func(
@@ -203,7 +203,7 @@ def trained_files_to_gcs(
     client = storage.Client()
     bucket = client.bucket(gcs_bucket_name)
 
-    with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="rb") as file:
+    with open(file=f"{model_path}", mode="rb") as file:
         blob = bucket.blob("listwise_ranking_model_weights.h5")
         blob.upload_from_file(file, content_type="bytes")
 

@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: listwise-ranking-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-07T20:58:55.993008',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-08T21:35:57.971308',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Listwise ranking pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Listwise ranking pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
@@ -137,8 +137,7 @@ spec:
             epochs = 1
             listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-            # with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="w+") as f:
-            listwise_model.save_weights(f"{model_path}/listwise_ranking_model_weights.h5")
+            listwise_model.save_weights(f"{model_path}", save_format='h5')
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
@@ -210,12 +209,10 @@ spec:
           compression=\"GZIP\")\n    test = tf.data.Dataset.load(test_path, compression=\"GZIP\")\n\n    cached_train
           = train.shuffle(100_000).batch(8192).cache()\n    cached_test = test.batch(4096).cache()\n\n    listwise_model
           = RankingModel(tfr.keras.losses.ListMLELoss())\n    listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))\n\n    epochs
-          = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    #
-          with open(file=f\"{model_path}/listwise_ranking_model_weights.h5\", mode=\"w+\")
-          as f:\n    listwise_model.save_weights(f\"{model_path}/listwise_ranking_model_weights.h5\")\n\nimport
-          argparse\n_parser = argparse.ArgumentParser(prog=''Build model'', description=''Function
-          to build model.'')\n_parser.add_argument(\"--unique-user-ids\", dest=\"unique_user_ids_path\",
-          type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
+          = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    listwise_model.save_weights(f\"{model_path}\",
+          save_format=''h5'')\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Build
+          model'', description=''Function to build model.'')\n_parser.add_argument(\"--unique-user-ids\",
+          dest=\"unique_user_ids_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
           dest=\"unique_movie_titles_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--train\",
           dest=\"train_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
           dest=\"test_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model\",
@@ -411,7 +408,7 @@ spec:
             client = storage.Client()
             bucket = client.bucket(gcs_bucket_name)
 
-            with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="rb") as file:
+            with open(file=f"{model_path}", mode="rb") as file:
                 blob = bucket.blob("listwise_ranking_model_weights.h5")
                 blob.upload_from_file(file, content_type="bytes")
 
@@ -474,7 +471,7 @@ spec:
           bool,\n    gcs_bucket_name,\n    model_path,\n):\n    \"\"\"Function to
           upload training output to gcs bucket.\"\"\"\n    from google.cloud import
           storage\n\n    # if not test_result:\n    #     return\n\n    client = storage.Client()\n    bucket
-          = client.bucket(gcs_bucket_name)\n\n    with open(file=f\"{model_path}/listwise_ranking_model_weights.h5\",
+          = client.bucket(gcs_bucket_name)\n\n    with open(file=f\"{model_path}\",
           mode=\"rb\") as file:\n        blob = bucket.blob(\"listwise_ranking_model_weights.h5\")\n        blob.upload_from_file(file,
           content_type=\"bytes\")\n\n    return True\n\ndef _serialize_bool(bool_value:
           bool) -> str:\n    if isinstance(bool_value, str):\n        return bool_value\n    if

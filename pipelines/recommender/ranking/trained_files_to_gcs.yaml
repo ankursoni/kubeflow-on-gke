@@ -30,7 +30,7 @@ implementation:
           client = storage.Client()
           bucket = client.bucket(gcs_bucket_name)
 
-          with open(file=f"{model_path}/listwise_ranking_model_weights.h5", mode="rb") as file:
+          with open(file=f"{model_path}", mode="rb") as file:
               blob = bucket.blob("listwise_ranking_model_weights.h5")
               blob.upload_from_file(file, content_type="bytes")
 
