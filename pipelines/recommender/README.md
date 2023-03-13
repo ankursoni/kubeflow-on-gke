@@ -3,12 +3,23 @@
 
 ## Pre-requisite
 References:
+- https://istio.io/latest/docs/setup/platform-setup/gke/
 - https://istio.io/latest/docs/setup/install/helm/
+- https://istio.io/latest/docs/tasks/traffic-management/ingress/ingress-control/
 - https://docs.seldon.io/projects/seldon-core/en/latest/workflow/install.html
 - https://docs.seldon.io/projects/seldon-core/en/latest/ingress/istio.html
-- https://istio.io/latest/docs/tasks/traffic-management/ingress/ingress-control/
 - https://www.kubeflow.org/docs/external-add-ons/serving/seldon/#seldon-serving
 ```shell
+# list firewall rules for master node
+gcloud compute firewall-rules list --filter="name~gke-<CLUSTER_NAME>-[0-9a-z]*-master"
+#example
+gcloud compute firewall-rules list --filter="name~gke-kubeflow-prototype-gke01-[0-9a-z]*-master"
+
+# add firewall rule for port 15017
+gcloud compute firewall-rules update <FIREWALL_RULE_NAME> --allow tcp:10250,tcp:443,tcp:15017
+# example,
+gcloud compute firewall-rules update gke-kubeflow-prototype-gke01-74e391f2-master --allow tcp:10250,tcp:443,tcp:15017
+
 # install istio
 helm repo add istio https://istio-release.storage.googleapis.com/charts
 helm repo update

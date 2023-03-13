@@ -6,10 +6,10 @@ spec:
   name: test-deployment
   predictors:
     - componentSpecs:
-        - spec:
-            containers:
-              - image: seldonio/mock_classifier_rest:1.3
-                name: classifier
+      - spec:
+          containers:
+            - image: seldonio/mock_classifier_rest:1.3
+              name: classifier
       graph:
         children: []
         endpoint:
