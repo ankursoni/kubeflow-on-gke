@@ -12,36 +12,38 @@ References:
 ```shell
 # list firewall rules for master node
 gcloud compute firewall-rules list --filter="name~gke-<CLUSTER_NAME>-[0-9a-z]*-master"
-#example
+# example,
 gcloud compute firewall-rules list --filter="name~gke-kubeflow-prototype-gke01-[0-9a-z]*-master"
 
-# add firewall rule for port 15017
-gcloud compute firewall-rules update <FIREWALL_RULE_NAME> --allow tcp:10250,tcp:443,tcp:15017
+# add firewall rule for port 15017 (istio) and 4443 (seldon)
+gcloud compute firewall-rules update <FIREWALL_RULE_NAME> --allow tcp:10250,tcp:443,tcp:15017,tcp:4443
 # example,
-gcloud compute firewall-rules update gke-kubeflow-prototype-gke01-74e391f2-master --allow tcp:10250,tcp:443,tcp:15017
+gcloud compute firewall-rules update gke-kubeflow-prototype-gke01-74e391f2-master --allow tcp:10250,tcp:443,tcp:15017,tcp:4443
 
 # install istio
 helm repo add istio https://istio-release.storage.googleapis.com/charts
 helm repo update
 
 kubectl create namespace istio-system
-helm install istio-base istio/base -n istio-system
+helm upgrade -i istio-base istio/base -n istio-system
 helm ls -n istio-system
 
-helm install istiod istio/istiod -n istio-system --wait
+helm upgrade -i istiod istio/istiod -n istio-system --wait
 helm ls -n istio-system
 helm status istiod -n istio-system
 
 kubectl get deployments -n istio-system --output wide
 
 kubectl create namespace istio-ingress
-helm install istio-ingress istio/gateway -n istio-ingress --wait
+helm upgrade -i istio-ingress istio/gateway -n istio-ingress --wait
 helm status istio-ingress -n istio-ingress
 
 # install seldon
+helm repo add seldonio https://storage.googleapis.com/seldon-charts
+helm repo update
+
 kubectl create namespace seldon-system
-helm install seldon-core seldon-core-operator \
-    --repo https://storage.googleapis.com/seldon-charts \
+helm upgrade -i seldon-core-operator seldonio/seldon-core-operator \
     --set usageMetrics.enabled=true \
     --set istio.enabled=true \
     --namespace seldon-system
@@ -51,10 +53,10 @@ kubectl label namespace seldon serving.kubeflow.org/inferenceservice=enabled
 
 # install seldon gateway running on port 80
 cd pipelines/recommender
-kubectl create -f seldon_gateway.yaml
+kubectl apply -f seldon_gateway.yaml
 
 # run simple example on seldon
-kubectl create -n seldon -f seldon_simple_example.yaml
+kubectl apply -n seldon -f seldon_simple_example.yaml
 ```
 
 
