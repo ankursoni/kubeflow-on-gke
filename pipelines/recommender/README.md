@@ -27,6 +27,7 @@ helm repo update
 kubectl create namespace istio-system
 helm upgrade -i istio-base istio/base -n istio-system
 helm ls -n istio-system
+helm status istio-base -n istio-system
 
 helm upgrade -i istiod istio/istiod -n istio-system --wait
 helm ls -n istio-system
@@ -36,6 +37,7 @@ kubectl get deployments -n istio-system --output wide
 
 kubectl create namespace istio-ingress
 helm upgrade -i istio-ingress istio/gateway -n istio-ingress --wait
+helm ls -n istio-ingress
 helm status istio-ingress -n istio-ingress
 
 # install seldon
@@ -47,6 +49,8 @@ helm upgrade -i seldon-core-operator seldonio/seldon-core-operator \
     --set usageMetrics.enabled=true \
     --set istio.enabled=true \
     --namespace seldon-system
+helm ls -n seldon-system
+helm status seldon-core-operator -n seldon-system
 
 kubectl create namespace seldon
 kubectl label namespace seldon serving.kubeflow.org/inferenceservice=enabled

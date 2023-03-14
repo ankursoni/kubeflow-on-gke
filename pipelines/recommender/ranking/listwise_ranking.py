@@ -179,7 +179,7 @@ def build_model(
     epochs = 1
     listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-    listwise_model.save_weights(f"{model_path}", save_format='h5')
+    listwise_model.save_weights(f"{model_path}", save_format="h5")
 
 
 build_model_op = kfp.components.create_component_from_func(
@@ -256,34 +256,58 @@ kfp.compiler.Compiler().compile(
 
 client = kfp.Client(host="http://localhost:3000")
 
-try:
-    client.upload_pipeline(
+# upload and run pipeline
+pipeline_name = "listwise ranking pipeline"
+pipeline_id = client.get_pipeline_id(pipeline_name)
+if not pipeline_id:
+    # create pipeline for the first time
+    pipeline = client.upload_pipeline(
         pipeline_package_path="listwise_ranking_pipeline.yaml",
-        pipeline_name="ranking",
-        description="ranking pipeline"
+        pipeline_name=pipeline_name,
+        description="listwise ranking pipeline",
     )
-except: 
-    version = client.upload_pipeline_version(
-        pipeline_package_path="listwise_ranking_pipeline.yaml",
-        pipeline_version_name="004",
-        pipeline_name="ranking",
-        description="ranking pipeline"
-    )
+    pipeline_id = pipeline.id
 
-experiment = client.create_experiment(
-    name="ranking experiment",
+# create a new version of the existing pipeline after deleteing all other versions
+version_name = "latest"
+versions = client.list_pipeline_versions(pipeline_id).versions
+for version in versions:
+    client.delete_pipeline_version(version.id)
+version = client.upload_pipeline_version(
+    pipeline_package_path="listwise_ranking_pipeline.yaml",
+    pipeline_version_name=version_name,
+    pipeline_id=pipeline_id,
 )
 
-client.create_recurring_run(
+experiment_name = "listwise ranking experiment"
+experiment = client.get_experiment(experiment_name=experiment_name)
+if not experiment:
+    # create experiment for the first time
+    experiment = client.create_experiment(
+        name="listwise ranking experiment",
+    )
+client.run_pipeline(
     experiment_id=experiment.id,
-    job_name="ranking every hour",
-    interval_second=3600,
-    version_id=version.id
+    job_name="listwise ranking job",
+    params={
+        "gcs_bucket_name": f"{os.environ.get('GCS_STORAGE_BUCKET_NAME')}",
+    },
+    pipeline_id=pipeline_id,
+    version_id=version.id,
 )
 
-#client.create_run_from_pipeline_func(
-#    listwise_ranking_pipeline,
-#    arguments={
-#        "gcs_bucket_name": f"{os.environ.get('GCS_STORAGE_BUCKET_NAME')}",
-#    },
-#)
+# # recurring runs
+# client.create_recurring_run(
+#     experiment_id=experiment.id,
+#     job_name="ranking every hour",
+#     interval_second=3600,
+#     version_id=version.id,
+# )
+
+# # one off runs without pipeline and experiment
+# client.create_run_from_pipeline_func(
+#     listwise_ranking_pipeline,
+#     arguments={
+#         "gcs_bucket_name": f"{os.environ.get('GCS_STORAGE_BUCKET_NAME')}",
+#     },
+# )

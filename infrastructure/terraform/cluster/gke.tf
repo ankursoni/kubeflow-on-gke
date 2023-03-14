@@ -18,7 +18,7 @@ resource "google_container_cluster" "gke01" {
   }
 
   release_channel {
-    channel = "RAPID"
+    channel = "STABLE"
   }
 
   workload_identity_config {
@@ -199,11 +199,11 @@ resource "google_container_node_pool" "nodepool03" {
 resource "google_compute_firewall" "webhook_firewallrule" {
   name        = "${google_container_cluster.gke01.name}-webhook"
   network     = var.network_id
-  description = "Port 8443 for admission controller webhook"
+  description = "Port 8443 (kubeflow?), 15017 (istio), 4443 (seldon) for admission controller webhook"
 
   allow {
     protocol = "tcp"
-    ports    = ["8443"]
+    ports    = ["8443", "15017", "4443"]
   }
 
   source_ranges = [var.master_ip_range]
