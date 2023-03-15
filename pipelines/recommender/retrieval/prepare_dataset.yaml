@@ -41,8 +41,6 @@ implementation:
           # Features of all the available movies.
           movies = tfds.load("movielens/100k-movies", split="train")
 
-          movies.save(movies_path, compression="GZIP")
-
           ratings = ratings.map(
               lambda x: {
                   "movie_title": x["movie_title"],
@@ -50,6 +48,8 @@ implementation:
               }
           )
           movies = movies.map(lambda x: x["movie_title"])
+
+          movies.save(movies_path, compression="GZIP")
 
           tf.random.set_seed(42)
           shuffled = ratings.shuffle(100_000, seed=42, reshuffle_each_iteration=False)

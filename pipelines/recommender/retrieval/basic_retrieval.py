@@ -24,8 +24,6 @@ def prepare_dataset(
     # Features of all the available movies.
     movies = tfds.load("movielens/100k-movies", split="train")
 
-    movies.save(movies_path, compression="GZIP")
-
     ratings = ratings.map(
         lambda x: {
             "movie_title": x["movie_title"],
@@ -33,6 +31,8 @@ def prepare_dataset(
         }
     )
     movies = movies.map(lambda x: x["movie_title"])
+
+    movies.save(movies_path, compression="GZIP")
 
     tf.random.set_seed(42)
     shuffled = ratings.shuffle(100_000, seed=42, reshuffle_each_iteration=False)
@@ -146,7 +146,7 @@ def build_model(
         )
     )
 
-    model.save(f"{model_path}/basic_retrieval_model.h5")
+    model.save_weights(f"{model_path}", save_format="h5")
 
 
 build_model_op = kfp.components.create_component_from_func(
@@ -170,8 +170,8 @@ def trained_files_to_gcs(
     client = storage.Client()
     bucket = client.bucket(gcs_bucket_name)
 
-    with open(file=f"{model_path}/basic_retrieval_model.h5", mode="rb") as file:
-        blob = bucket.blob("basic_retrieval_model.h5")
+    with open(file=f"{model_path}", mode="rb") as file:
+        blob = bucket.blob("basic_retrieval_model_weights.h5")
         blob.upload_from_file(file, content_type="bytes")
 
     return True
@@ -222,9 +222,58 @@ kfp.compiler.Compiler().compile(
 )
 
 client = kfp.Client(host="http://localhost:3000")
-client.create_run_from_pipeline_func(
-    basic_retrieval_pipeline,
-    arguments={
+
+# upload and run pipeline
+pipeline_name = "basic retrieval pipeline"
+pipeline_id = client.get_pipeline_id(pipeline_name)
+if not pipeline_id:
+    # create pipeline for the first time
+    pipeline = client.upload_pipeline(
+        pipeline_package_path="basic_retrieval_pipeline.yaml",
+        pipeline_name=pipeline_name,
+        description="basic retrieval pipeline",
+    )
+    pipeline_id = pipeline.id
+
+# create a new version of the existing pipeline after deleteing all other versions
+version_name = "latest"
+versions = client.list_pipeline_versions(pipeline_id).versions
+for version in versions:
+    client.delete_pipeline_version(version.id)
+version = client.upload_pipeline_version(
+    pipeline_package_path="basic_retrieval_pipeline.yaml",
+    pipeline_version_name=version_name,
+    pipeline_id=pipeline_id,
+)
+
+experiment_name = "basic retrieval experiment"
+try:
+    experiment = client.get_experiment(experiment_name=experiment_name)
+except:
+    # create experiment for the first time
+    experiment = client.create_experiment(name=experiment_name)
+client.run_pipeline(
+    experiment_id=experiment.id,
+    job_name="basic retrieval job",
+    params={
         "gcs_bucket_name": f"{os.environ.get('GCS_STORAGE_BUCKET_NAME')}",
     },
+    pipeline_id=pipeline_id,
+    version_id=version.id,
 )
+
+# # recurring runs
+# client.create_recurring_run(
+#     experiment_id=experiment.id,
+#     job_name="retrieval every hour",
+#     interval_second=3600,
+#     version_id=version.id,
+# )
+
+# # one off runs without pipeline and experiment
+# client.create_run_from_pipeline_func(
+#     basic_retrieval_pipeline,
+#     arguments={
+#         "gcs_bucket_name": f"{os.environ.get('GCS_STORAGE_BUCKET_NAME')}",
+#     },
+# )

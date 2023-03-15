@@ -280,12 +280,11 @@ version = client.upload_pipeline_version(
 )
 
 experiment_name = "listwise ranking experiment"
-experiment = client.get_experiment(experiment_name=experiment_name)
-if not experiment:
+try:
+    experiment = client.get_experiment(experiment_name=experiment_name)
+except:
     # create experiment for the first time
-    experiment = client.create_experiment(
-        name="listwise ranking experiment",
-    )
+    experiment = client.create_experiment(name=experiment_name)
 client.run_pipeline(
     experiment_id=experiment.id,
     job_name="listwise ranking job",
