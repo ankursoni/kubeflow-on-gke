@@ -5,8 +5,7 @@ inputs:
 - {name: unique_movie_titles}
 - {name: train}
 - {name: test}
-outputs:
-- {name: model}
+- {name: gcs_bucket_name, type: String}
 implementation:
   container:
     image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
@@ -18,17 +17,12 @@ implementation:
       printf "%s" "$0" > "$program_path"
       python3 -u "$program_path" "$@"
     - |
-      def _make_parent_dirs_and_return_path(file_path: str):
-          import os
-          os.makedirs(os.path.dirname(file_path), exist_ok=True)
-          return file_path
-
       def build_model(
           unique_user_ids_path,
           unique_movie_titles_path,
           train_path,
           test_path,
-          model_path,
+          gcs_bucket_name,
       ):
           """Function to build model."""
           import pickle
@@ -133,7 +127,11 @@ implementation:
           epochs = 1
           listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
-          listwise_model.save_weights(f"{model_path}", save_format="h5")
+          # listwise_model.save_weights(f"{model_path}", save_format="h5")
+          tf.saved_model.save(
+              listwise_model,
+              f"gs://{gcs_bucket_name}/listwise_ranking_model",
+          )
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
@@ -141,7 +139,7 @@ implementation:
       _parser.add_argument("--unique-movie-titles", dest="unique_movie_titles_path", type=str, required=True, default=argparse.SUPPRESS)
       _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
       _parser.add_argument("--test", dest="test_path", type=str, required=True, default=argparse.SUPPRESS)
-      _parser.add_argument("--model", dest="model_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--gcs-bucket-name", dest="gcs_bucket_name", type=str, required=True, default=argparse.SUPPRESS)
       _parsed_args = vars(_parser.parse_args())
 
       _outputs = build_model(**_parsed_args)
@@ -154,5 +152,5 @@ implementation:
     - {inputPath: train}
     - --test
     - {inputPath: test}
-    - --model
-    - {outputPath: model}
+    - --gcs-bucket-name
+    - {inputValue: gcs_bucket_name}

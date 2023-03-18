@@ -235,6 +235,11 @@ resource "google_service_account" "kfp_user_sa01" {
   account_id   = "gke01-kfp-user"
   display_name = "Service Account for kubeflow kfp-user"
 }
+resource "google_storage_bucket_iam_member" "viewer" {
+  bucket = var.storagebucket_id
+  role   = "roles/storage.legacyBucketReader"
+  member = "serviceAccount:${google_service_account.kfp_user_sa01.email}"
+}
 resource "google_storage_bucket_iam_member" "object_admin01" {
   bucket = var.storagebucket_id
   role   = "roles/storage.objectAdmin"

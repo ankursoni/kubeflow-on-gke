@@ -68,7 +68,7 @@ def build_model(
     unique_movie_titles_path: comp.InputPath(),
     train_path: comp.InputPath(),
     test_path: comp.InputPath(),
-    model_path: comp.OutputPath(),
+    gcs_bucket_name: str,
 ) -> None:
     """Function to build model."""
     import pickle
@@ -146,7 +146,8 @@ def build_model(
         )
     )
 
-    model.save_weights(f"{model_path}", save_format="h5")
+    # model.save_weights(f"{model_path}", save_format="h5")
+    tf.saved_model.save(model, f"gs://{gcs_bucket_name}/basic_retrieval_model")
 
 
 build_model_op = kfp.components.create_component_from_func(
@@ -156,32 +157,32 @@ build_model_op = kfp.components.create_component_from_func(
 )
 
 
-def trained_files_to_gcs(
-    # test_result: bool,
-    gcs_bucket_name: str,
-    model_path: comp.InputPath(),
-) -> bool:
-    """Function to upload training output to gcs bucket."""
-    from google.cloud import storage
+# def trained_files_to_gcs(
+#     # test_result: bool,
+#     gcs_bucket_name: str,
+#     model_path: comp.InputPath(),
+# ) -> bool:
+#     """Function to upload training output to gcs bucket."""
+#     from google.cloud import storage
 
-    # if not test_result:
-    #     return
+#     # if not test_result:
+#     #     return
 
-    client = storage.Client()
-    bucket = client.bucket(gcs_bucket_name)
+#     client = storage.Client()
+#     bucket = client.bucket(gcs_bucket_name)
 
-    with open(file=f"{model_path}", mode="rb") as file:
-        blob = bucket.blob("basic_retrieval_model_weights.h5")
-        blob.upload_from_file(file, content_type="bytes")
+#     with open(file=f"{model_path}", mode="rb") as file:
+#         blob = bucket.blob("basic_retrieval_model_weights.h5")
+#         blob.upload_from_file(file, content_type="bytes")
 
-    return True
+#     return True
 
 
-trained_files_to_gcs_op = kfp.components.create_component_from_func(
-    trained_files_to_gcs,
-    output_component_file="trained_files_to_gcs.yaml",
-    base_image="eu.gcr.io/kubeflow-bg-experiment/recommender:latest",
-)
+# trained_files_to_gcs_op = kfp.components.create_component_from_func(
+#     trained_files_to_gcs,
+#     output_component_file="trained_files_to_gcs.yaml",
+#     base_image="eu.gcr.io/kubeflow-bg-experiment/recommender:latest",
+# )
 
 
 @dsl.pipeline(
@@ -201,20 +202,21 @@ def basic_retrieval_pipeline(gcs_bucket_name):
         unique_movie_titles=prepare_dataset_task.outputs["unique_movie_titles"],
         train=prepare_dataset_task.outputs["train"],
         test=prepare_dataset_task.outputs["test"],
+        gcs_bucket_name=gcs_bucket_name,
     )
     build_model_task.container.set_image_pull_policy("Always")
     build_model_task.set_caching_options(False)
     build_model_task.execution_options.caching_strategy.max_cache_staleness = "P0D"
 
-    trained_files_to_gcs_task = trained_files_to_gcs_op(
-        gcs_bucket_name=gcs_bucket_name,
-        model=build_model_task.outputs["model"],
-    )
-    trained_files_to_gcs_task.container.set_image_pull_policy("Always")
-    trained_files_to_gcs_task.set_caching_options(False)
-    trained_files_to_gcs_task.execution_options.caching_strategy.max_cache_staleness = (
-        "P0D"
-    )
+    # trained_files_to_gcs_task = trained_files_to_gcs_op(
+    #     gcs_bucket_name=gcs_bucket_name,
+    #     model=build_model_task.outputs["model"],
+    # )
+    # trained_files_to_gcs_task.container.set_image_pull_policy("Always")
+    # trained_files_to_gcs_task.set_caching_options(False)
+    # trained_files_to_gcs_task.execution_options.caching_strategy.max_cache_staleness = (
+    #     "P0D"
+    # )
 
 
 kfp.compiler.Compiler().compile(

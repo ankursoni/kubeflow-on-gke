@@ -2,3 +2,5 @@
 ?*secret*
 .terraform*
 *.tfstate*
+tmp/
+temp/

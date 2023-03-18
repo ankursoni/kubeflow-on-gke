@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: basic-retrieval-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-15T22:55:39.845782',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-19T07:10:00.580563',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Basic retrieval pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Basic retrieval pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
@@ -19,6 +19,8 @@ spec:
         template: build-model
         dependencies: [prepare-dataset]
         arguments:
+          parameters:
+          - {name: gcs_bucket_name, value: '{{inputs.parameters.gcs_bucket_name}}'}
           artifacts:
           - {name: prepare-dataset-movies, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-movies}}'}
           - {name: prepare-dataset-test, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-test}}'}
@@ -26,19 +28,11 @@ spec:
           - {name: prepare-dataset-unique_movie_titles, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-unique_movie_titles}}'}
           - {name: prepare-dataset-unique_user_ids, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-unique_user_ids}}'}
       - {name: prepare-dataset, template: prepare-dataset}
-      - name: trained-files-to-gcs
-        template: trained-files-to-gcs
-        dependencies: [build-model]
-        arguments:
-          parameters:
-          - {name: gcs_bucket_name, value: '{{inputs.parameters.gcs_bucket_name}}'}
-          artifacts:
-          - {name: build-model-model, from: '{{tasks.build-model.outputs.artifacts.build-model-model}}'}
   - name: build-model
     container:
       args: [--movies, /tmp/inputs/movies/data, --unique-user-ids, /tmp/inputs/unique_user_ids/data,
         --unique-movie-titles, /tmp/inputs/unique_movie_titles/data, --train, /tmp/inputs/train/data,
-        --test, /tmp/inputs/test/data, --model, /tmp/outputs/model/data]
+        --test, /tmp/inputs/test/data, --gcs-bucket-name, '{{inputs.parameters.gcs_bucket_name}}']
       command:
       - sh
       - -ec
@@ -47,18 +41,13 @@ spec:
         printf "%s" "$0" > "$program_path"
         python3 -u "$program_path" "$@"
       - |
-        def _make_parent_dirs_and_return_path(file_path: str):
-            import os
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            return file_path
-
         def build_model(
             movies_path,
             unique_user_ids_path,
             unique_movie_titles_path,
             train_path,
             test_path,
-            model_path,
+            gcs_bucket_name,
         ):
             """Function to build model."""
             import pickle
@@ -136,7 +125,8 @@ spec:
                 )
             )
 
-            model.save_weights(f"{model_path}", save_format="h5")
+            # model.save_weights(f"{model_path}", save_format="h5")
+            tf.saved_model.save(model, f"gs://{gcs_bucket_name}/basic_retrieval_model")
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
@@ -145,22 +135,21 @@ spec:
         _parser.add_argument("--unique-movie-titles", dest="unique_movie_titles_path", type=str, required=True, default=argparse.SUPPRESS)
         _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
         _parser.add_argument("--test", dest="test_path", type=str, required=True, default=argparse.SUPPRESS)
-        _parser.add_argument("--model", dest="model_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--gcs-bucket-name", dest="gcs_bucket_name", type=str, required=True, default=argparse.SUPPRESS)
         _parsed_args = vars(_parser.parse_args())
 
         _outputs = build_model(**_parsed_args)
       image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
       imagePullPolicy: Always
     inputs:
+      parameters:
+      - {name: gcs_bucket_name}
       artifacts:
       - {name: prepare-dataset-movies, path: /tmp/inputs/movies/data}
       - {name: prepare-dataset-test, path: /tmp/inputs/test/data}
       - {name: prepare-dataset-train, path: /tmp/inputs/train/data}
       - {name: prepare-dataset-unique_movie_titles, path: /tmp/inputs/unique_movie_titles/data}
       - {name: prepare-dataset-unique_user_ids, path: /tmp/inputs/unique_user_ids/data}
-    outputs:
-      artifacts:
-      - {name: build-model-model, path: /tmp/outputs/model/data}
     metadata:
       labels:
         pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
@@ -170,11 +159,10 @@ spec:
           to build model.", "implementation": {"container": {"args": ["--movies",
           {"inputPath": "movies"}, "--unique-user-ids", {"inputPath": "unique_user_ids"},
           "--unique-movie-titles", {"inputPath": "unique_movie_titles"}, "--train",
-          {"inputPath": "train"}, "--test", {"inputPath": "test"}, "--model", {"outputPath":
-          "model"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\"
-          \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n", "def
-          _make_parent_dirs_and_return_path(file_path: str):\n    import os\n    os.makedirs(os.path.dirname(file_path),
-          exist_ok=True)\n    return file_path\n\ndef build_model(\n    movies_path,\n    unique_user_ids_path,\n    unique_movie_titles_path,\n    train_path,\n    test_path,\n    model_path,\n):\n    \"\"\"Function
+          {"inputPath": "train"}, "--test", {"inputPath": "test"}, "--gcs-bucket-name",
+          {"inputValue": "gcs_bucket_name"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
+          "def build_model(\n    movies_path,\n    unique_user_ids_path,\n    unique_movie_titles_path,\n    train_path,\n    test_path,\n    gcs_bucket_name,\n):\n    \"\"\"Function
           to build model.\"\"\"\n    import pickle\n    from typing import Dict, Text\n\n    import
           tensorflow as tf\n    import tensorflow_recommenders as tfrs\n\n    embedding_dimension
           = 32\n\n    movies = tf.data.Dataset.load(movies_path, compression=\"GZIP\")\n\n    with
@@ -205,20 +193,23 @@ spec:
           return_dict=True)\n\n    # Create a model that takes in raw query features,
           and\n    index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)\n    #
           recommends movies out of the entire movies dataset.\n    index.index_from_dataset(\n        tf.data.Dataset.zip(\n            (movies.batch(100),
-          movies.batch(100).map(model.movie_model))\n        )\n    )\n\n    model.save_weights(f\"{model_path}\",
-          save_format=\"h5\")\n\nimport argparse\n_parser = argparse.ArgumentParser(prog=''Build
-          model'', description=''Function to build model.'')\n_parser.add_argument(\"--movies\",
-          dest=\"movies_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-user-ids\",
+          movies.batch(100).map(model.movie_model))\n        )\n    )\n\n    # model.save_weights(f\"{model_path}\",
+          save_format=\"h5\")\n    tf.saved_model.save(model, f\"gs://{gcs_bucket_name}/basic_retrieval_model\")\n\nimport
+          argparse\n_parser = argparse.ArgumentParser(prog=''Build model'', description=''Function
+          to build model.'')\n_parser.add_argument(\"--movies\", dest=\"movies_path\",
+          type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-user-ids\",
           dest=\"unique_user_ids_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",
           dest=\"unique_movie_titles_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--train\",
           dest=\"train_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
-          dest=\"test_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model\",
-          dest=\"model_path\", type=_make_parent_dirs_and_return_path, required=True,
-          default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
-          = build_model(**_parsed_args)\n"], "image": "eu.gcr.io/kubeflow-bg-experiment/recommender:latest"}},
-          "inputs": [{"name": "movies"}, {"name": "unique_user_ids"}, {"name": "unique_movie_titles"},
-          {"name": "train"}, {"name": "test"}], "name": "Build model", "outputs":
-          [{"name": "model"}]}', pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/max_cache_staleness: P0D}
+          dest=\"test_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--gcs-bucket-name\",
+          dest=\"gcs_bucket_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          = vars(_parser.parse_args())\n\n_outputs = build_model(**_parsed_args)\n"],
+          "image": "eu.gcr.io/kubeflow-bg-experiment/recommender:latest"}}, "inputs":
+          [{"name": "movies"}, {"name": "unique_user_ids"}, {"name": "unique_movie_titles"},
+          {"name": "train"}, {"name": "test"}, {"name": "gcs_bucket_name", "type":
+          "String"}], "name": "Build model"}', pipelines.kubeflow.org/component_ref: '{}',
+        pipelines.kubeflow.org/arguments.parameters: '{"gcs_bucket_name": "{{inputs.parameters.gcs_bucket_name}}"}',
+        pipelines.kubeflow.org/max_cache_staleness: P0D}
   - name: prepare-dataset
     container:
       args: [--movies, /tmp/outputs/movies/data, --train, /tmp/outputs/train/data,
@@ -349,116 +340,6 @@ spec:
           "name": "Prepare dataset", "outputs": [{"name": "movies"}, {"name": "train"},
           {"name": "test"}, {"name": "unique_movie_titles"}, {"name": "unique_user_ids"}]}',
         pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/max_cache_staleness: P0D}
-  - name: trained-files-to-gcs
-    container:
-      args: [--gcs-bucket-name, '{{inputs.parameters.gcs_bucket_name}}', --model,
-        /tmp/inputs/model/data, '----output-paths', /tmp/outputs/Output/data]
-      command:
-      - sh
-      - -ec
-      - |
-        program_path=$(mktemp)
-        printf "%s" "$0" > "$program_path"
-        python3 -u "$program_path" "$@"
-      - |
-        def trained_files_to_gcs(
-            # test_result: bool,
-            gcs_bucket_name,
-            model_path,
-        ):
-            """Function to upload training output to gcs bucket."""
-            from google.cloud import storage
-
-            # if not test_result:
-            #     return
-
-            client = storage.Client()
-            bucket = client.bucket(gcs_bucket_name)
-
-            with open(file=f"{model_path}", mode="rb") as file:
-                blob = bucket.blob("basic_retrieval_model_weights.h5")
-                blob.upload_from_file(file, content_type="bytes")
-
-            return True
-
-        def _serialize_bool(bool_value: bool) -> str:
-            if isinstance(bool_value, str):
-                return bool_value
-            if not isinstance(bool_value, bool):
-                raise TypeError('Value "{}" has type "{}" instead of bool.'.format(
-                    str(bool_value), str(type(bool_value))))
-            return str(bool_value)
-
-        import argparse
-        _parser = argparse.ArgumentParser(prog='Trained files to gcs', description='Function to upload training output to gcs bucket.')
-        _parser.add_argument("--gcs-bucket-name", dest="gcs_bucket_name", type=str, required=True, default=argparse.SUPPRESS)
-        _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
-        _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=1)
-        _parsed_args = vars(_parser.parse_args())
-        _output_files = _parsed_args.pop("_output_paths", [])
-
-        _outputs = trained_files_to_gcs(**_parsed_args)
-
-        _outputs = [_outputs]
-
-        _output_serializers = [
-            _serialize_bool,
-
-        ]
-
-        import os
-        for idx, output_file in enumerate(_output_files):
-            try:
-                os.makedirs(os.path.dirname(output_file))
-            except OSError:
-                pass
-            with open(output_file, 'w') as f:
-                f.write(_output_serializers[idx](_outputs[idx]))
-      image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
-      imagePullPolicy: Always
-    inputs:
-      parameters:
-      - {name: gcs_bucket_name}
-      artifacts:
-      - {name: build-model-model, path: /tmp/inputs/model/data}
-    outputs:
-      artifacts:
-      - {name: trained-files-to-gcs-Output, path: /tmp/outputs/Output/data}
-    metadata:
-      labels:
-        pipelines.kubeflow.org/kfp_sdk_version: 1.8.19
-        pipelines.kubeflow.org/pipeline-sdk-type: kfp
-        pipelines.kubeflow.org/enable_caching: "false"
-      annotations: {pipelines.kubeflow.org/component_spec: '{"description": "Function
-          to upload training output to gcs bucket.", "implementation": {"container":
-          {"args": ["--gcs-bucket-name", {"inputValue": "gcs_bucket_name"}, "--model",
-          {"inputPath": "model"}, "----output-paths", {"outputPath": "Output"}], "command":
-          ["sh", "-ec", "program_path=$(mktemp)\nprintf \"%s\" \"$0\" > \"$program_path\"\npython3
-          -u \"$program_path\" \"$@\"\n", "def trained_files_to_gcs(\n    # test_result:
-          bool,\n    gcs_bucket_name,\n    model_path,\n):\n    \"\"\"Function to
-          upload training output to gcs bucket.\"\"\"\n    from google.cloud import
-          storage\n\n    # if not test_result:\n    #     return\n\n    client = storage.Client()\n    bucket
-          = client.bucket(gcs_bucket_name)\n\n    with open(file=f\"{model_path}\",
-          mode=\"rb\") as file:\n        blob = bucket.blob(\"basic_retrieval_model_weights.h5\")\n        blob.upload_from_file(file,
-          content_type=\"bytes\")\n\n    return True\n\ndef _serialize_bool(bool_value:
-          bool) -> str:\n    if isinstance(bool_value, str):\n        return bool_value\n    if
-          not isinstance(bool_value, bool):\n        raise TypeError(''Value \"{}\"
-          has type \"{}\" instead of bool.''.format(\n            str(bool_value),
-          str(type(bool_value))))\n    return str(bool_value)\n\nimport argparse\n_parser
-          = argparse.ArgumentParser(prog=''Trained files to gcs'', description=''Function
-          to upload training output to gcs bucket.'')\n_parser.add_argument(\"--gcs-bucket-name\",
-          dest=\"gcs_bucket_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model\",
-          dest=\"model_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"----output-paths\",
-          dest=\"_output_paths\", type=str, nargs=1)\n_parsed_args = vars(_parser.parse_args())\n_output_files
-          = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = trained_files_to_gcs(**_parsed_args)\n\n_outputs
-          = [_outputs]\n\n_output_serializers = [\n    _serialize_bool,\n\n]\n\nimport
-          os\nfor idx, output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n    except
-          OSError:\n        pass\n    with open(output_file, ''w'') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"],
-          "image": "eu.gcr.io/kubeflow-bg-experiment/recommender:latest"}}, "inputs":
-          [{"name": "gcs_bucket_name", "type": "String"}, {"name": "model"}], "name":
-          "Trained files to gcs", "outputs": [{"name": "Output", "type": "Boolean"}]}',
-        pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/arguments.parameters: '{"gcs_bucket_name":
-          "{{inputs.parameters.gcs_bucket_name}}"}', pipelines.kubeflow.org/max_cache_staleness: P0D}
   arguments:
     parameters:
     - {name: gcs_bucket_name}
