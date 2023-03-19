@@ -235,7 +235,7 @@ resource "google_service_account" "kfp_user_sa01" {
   account_id   = "gke01-kfp-user"
   display_name = "Service Account for kubeflow kfp-user"
 }
-resource "google_storage_bucket_iam_member" "viewer" {
+resource "google_storage_bucket_iam_member" "legacy_bucket_reader01" {
   bucket = var.storagebucket_id
   role   = "roles/storage.legacyBucketReader"
   member = "serviceAccount:${google_service_account.kfp_user_sa01.email}"
@@ -249,4 +249,19 @@ resource "google_service_account_iam_binding" "kfp_user_iam01" {
   service_account_id = google_service_account.kfp_user_sa01.name
   role               = "roles/iam.workloadIdentityUser"
   members            = ["serviceAccount:${var.project_id}.svc.id.goog[kubeflow/pipeline-runner]"]
+}
+
+resource "google_service_account" "model_serve_user_sa01" {
+  account_id   = "gke01-model-serve-user"
+  display_name = "Service Account for model serve user"
+}
+resource "google_storage_bucket_iam_member" "object_viewer03" {
+  bucket = var.storagebucket_id
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.model_serve_user_sa01.email}"
+}
+resource "google_service_account_iam_binding" "model_serve_user_iam01" {
+  service_account_id = google_service_account.model_serve_user_sa01.name
+  role               = "roles/iam.workloadIdentityUser"
+  members            = ["serviceAccount:${var.project_id}.svc.id.goog[seldon/ml-model-serve-user]"]
 }

@@ -130,6 +130,16 @@ export KSA="ml-pipeline-ui"
 export GSA="gke01-kfp-system@${PROJECT_ID}.iam.gserviceaccount.com"
 export KSA="ml-pipeline-visualizationserver"
 
+export NAMESPACE="seldon"
+export GSA="gke01-model-serve-user@${PROJECT_ID}.iam.gserviceaccount.com"
+export KSA="ml-model-serve-user"
+kubectl create serviceaccount -n $NAMESPACE $KSA
+kubectl annotate serviceaccount \
+  --namespace $NAMESPACE \
+  --overwrite \
+  $KSA \
+  iam.gke.io/gcp-service-account=$GSA
+
 # port forward from kubeflow pipeline ui service
 kubectl port-forward --namespace kubeflow svc/ml-pipeline-ui 3000:80
 ```

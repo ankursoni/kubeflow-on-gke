@@ -60,7 +60,7 @@ cd pipelines/recommender
 kubectl apply -f seldon_gateway.yaml
 
 # run simple example on seldon
-kubectl apply -n seldon -f seldon_simple_example.yaml
+kubectl apply -f seldon_simple_example.yaml
 ```
 
 
@@ -96,4 +96,10 @@ GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-storagebucket01" \
 cd ../ranking
 GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-storagebucket01" \
   python listwise_ranking.py
+
+
+# after model output is saved to gcs bucket then,
+# run listwise ranking model serve on seldon
+cd ..
+kubectl apply -f seldon_listwise_ranking_model_serve.yaml
 ```

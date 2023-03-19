@@ -1,0 +1,15 @@
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: seldon-listwise-ranking-model
+  namespace: seldon
+spec:
+  predictors:
+    - name: listwise-ranking-model-serve-baseline
+      traffic: 100
+      graph:
+        name: classifier
+        modelUri: gs://kubeflow-prototype-storagebucket01/listwise_ranking_model
+        implementation: SKLEARN_SERVER
+      # componentSpecs:
+      #   - serviceAccountName: ml-model-serve-user
