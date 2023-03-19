@@ -11,5 +11,4 @@ spec:
         name: classifier
         modelUri: gs://kubeflow-prototype-storagebucket01/listwise_ranking_model
         implementation: SKLEARN_SERVER
-      # componentSpecs:
-      #   - serviceAccountName: ml-model-serve-user
+        serviceAccountName: ml-model-serve-user
