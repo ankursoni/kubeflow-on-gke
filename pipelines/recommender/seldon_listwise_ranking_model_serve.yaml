@@ -4,15 +4,24 @@ metadata:
   name: seldon-listwise-ranking-model
   namespace: seldon
 spec:
+  name: listwise-ranking-model-serve-baseline
   predictors:
     - name: listwise-ranking-model-serve-baseline
       traffic: 100
       graph:
         name: classifier
-        #serviceAccountName: ml-model-serve-user
+        #serviceAccountName: ml-model-serve-user <--- not sure if we need this
         modelUri: gs://kubeflow-prototype-storagebucket01/listwise_ranking_model
-        implementation: SKLEARN_SERVER
+        implementation: TENSORFLOW_SERVER
         envSecretRefName: seldon-rclone-secret
+        parameters:
+        #- name: signature_name
+        #  type: STRING
+        #  value: fingerprint
+        #- name: model_name
+        #  type: STRING
+        #  value: saved_model
       
 
         
+
