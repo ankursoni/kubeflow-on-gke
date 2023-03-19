@@ -9,7 +9,10 @@ spec:
       traffic: 100
       graph:
         name: classifier
+        serviceAccountName: ml-model-serve-user
         modelUri: gs://kubeflow-prototype-storagebucket01/listwise_ranking_model
         implementation: SKLEARN_SERVER
-      # componentSpecs:
-      #   - serviceAccountName: ml-model-serve-user
+        envSecretRefName: seldon-rclone-secret
+      
+
+        
