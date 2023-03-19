@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: listwise-ranking-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-19T07:05:20.656258',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-19T20:35:53.419318',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Listwise ranking pipeline",
       "inputs": [{"name": "gcs_bucket_name"}], "name": "Listwise ranking pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
@@ -135,7 +135,7 @@ spec:
             # listwise_model.save_weights(f"{model_path}", save_format="h5")
             tf.saved_model.save(
                 listwise_model,
-                f"gs://{gcs_bucket_name}/listwise_ranking_model",
+                f"gs://{gcs_bucket_name}/listwise-ranking-model/1/",
             )
 
         import argparse
@@ -207,7 +207,7 @@ spec:
           = train.shuffle(100_000).batch(8192).cache()\n    cached_test = test.batch(4096).cache()\n\n    listwise_model
           = RankingModel(tfr.keras.losses.ListMLELoss())\n    listwise_model.compile(optimizer=tf.keras.optimizers.Adagrad(0.1))\n\n    epochs
           = 1\n    listwise_model.fit(cached_train, epochs=epochs, verbose=False)\n\n    #
-          listwise_model.save_weights(f\"{model_path}\", save_format=\"h5\")\n    tf.saved_model.save(\n        listwise_model,\n        f\"gs://{gcs_bucket_name}/listwise_ranking_model\",\n    )\n\nimport
+          listwise_model.save_weights(f\"{model_path}\", save_format=\"h5\")\n    tf.saved_model.save(\n        listwise_model,\n        f\"gs://{gcs_bucket_name}/listwise-ranking-model/1/\",\n    )\n\nimport
           argparse\n_parser = argparse.ArgumentParser(prog=''Build model'', description=''Function
           to build model.'')\n_parser.add_argument(\"--unique-user-ids\", dest=\"unique_user_ids_path\",
           type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-movie-titles\",

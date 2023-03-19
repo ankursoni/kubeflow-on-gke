@@ -182,7 +182,7 @@ def build_model(
     # listwise_model.save_weights(f"{model_path}", save_format="h5")
     tf.saved_model.save(
         listwise_model,
-        f"gs://{gcs_bucket_name}/listwise_ranking_model",
+        f"gs://{gcs_bucket_name}/listwise-ranking-model/1/",
     )
 
 
