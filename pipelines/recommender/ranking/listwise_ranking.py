@@ -182,10 +182,12 @@ def build_model(
     # listwise_model.save_weights(f"{model_path}", save_format="h5")
     tf.saved_model.save(
         listwise_model,
-        f"gs://{gcs_bucket_name}/listwise-ranking-model/1/",
+        f"gs://{gcs_bucket_name}/listwise-ranking-model/",
     )
-
-
+    # TODO : 
+    # sess = tf.compat.v1.keras.backend.get_session()
+    # tf.train.write_graph(sess.graph_def, '.', 'gs://{gcs_bucket_name}/listwise-ranking-model/1/model.graphdef', as_text=False)
+    
 build_model_op = kfp.components.create_component_from_func(
     build_model,
     output_component_file="build_model.yaml",
@@ -299,6 +301,9 @@ client.run_pipeline(
     pipeline_id=pipeline_id,
     version_id=version.id,
 )
+
+
+
 
 # # recurring runs
 # client.create_recurring_run(

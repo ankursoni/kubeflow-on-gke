@@ -1,0 +1,18 @@
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: triton
+  namespace: seldon
+spec:
+  protocol: v2
+  predictors:
+  - graph:
+      children: []
+      implementation: TRITON_SERVER
+      modelUri: gs://kubeflow-prototype-storagebucket01/listwise-ranking-model
+      name: listwise-ranking-model
+      #serviceAccountName: ml-model-serve-user 
+      envSecretRefName: seldon-rclone-secret
+    name: listwise-ranking-model
+    replicas: 1
+
