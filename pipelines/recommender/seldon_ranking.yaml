@@ -9,9 +9,9 @@ spec:
   - graph:
       children: []
       implementation: TRITON_SERVER
-      modelUri: gs://kubeflow-prototype-storagebucket01/listwise-ranking-model
+      modelUri: gs://kubeflow-prototype-storagebucket01/
       name: listwise-ranking-model
-      #serviceAccountName: ml-model-serve-user 
+      #serviceAccountName: ml-model-serve-user <-- not required
       envSecretRefName: seldon-rclone-secret
     name: listwise-ranking-model
     replicas: 1
