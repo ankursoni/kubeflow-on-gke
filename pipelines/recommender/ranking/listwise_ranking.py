@@ -184,7 +184,7 @@ def build_model(
 
     tf.saved_model.save(
         listwise_model,
-        f"gs://{gcs_bucket_name}/listwise-ranking-model/{model_version_number}/model.savedmodel/",
+        f"gs://{gcs_bucket_name}/triton-recommender-ranking/{model_version_number}/model.savedmodel/",
     )
     
 build_model_op = kfp.components.create_component_from_func(
