@@ -2,9 +2,10 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: basic-retrieval-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-19T07:10:00.580563',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-22T07:50:08.561418',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Basic retrieval pipeline",
-      "inputs": [{"name": "gcs_bucket_name"}], "name": "Basic retrieval pipeline"}'}
+      "inputs": [{"name": "gcs_bucket_name"}, {"name": "model_version_number"}], "name":
+      "Basic retrieval pipeline"}'}
   labels: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19}
 spec:
   entrypoint: basic-retrieval-pipeline
@@ -13,6 +14,7 @@ spec:
     inputs:
       parameters:
       - {name: gcs_bucket_name}
+      - {name: model_version_number}
     dag:
       tasks:
       - name: build-model
@@ -21,6 +23,7 @@ spec:
         arguments:
           parameters:
           - {name: gcs_bucket_name, value: '{{inputs.parameters.gcs_bucket_name}}'}
+          - {name: model_version_number, value: '{{inputs.parameters.model_version_number}}'}
           artifacts:
           - {name: prepare-dataset-movies, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-movies}}'}
           - {name: prepare-dataset-test, from: '{{tasks.prepare-dataset.outputs.artifacts.prepare-dataset-test}}'}
@@ -32,7 +35,8 @@ spec:
     container:
       args: [--movies, /tmp/inputs/movies/data, --unique-user-ids, /tmp/inputs/unique_user_ids/data,
         --unique-movie-titles, /tmp/inputs/unique_movie_titles/data, --train, /tmp/inputs/train/data,
-        --test, /tmp/inputs/test/data, --gcs-bucket-name, '{{inputs.parameters.gcs_bucket_name}}']
+        --test, /tmp/inputs/test/data, --gcs-bucket-name, '{{inputs.parameters.gcs_bucket_name}}',
+        --model-version-number, '{{inputs.parameters.model_version_number}}']
       command:
       - sh
       - -ec
@@ -48,6 +52,7 @@ spec:
             train_path,
             test_path,
             gcs_bucket_name,
+            model_version_number,
         ):
             """Function to build model."""
             import pickle
@@ -126,7 +131,10 @@ spec:
             )
 
             # model.save_weights(f"{model_path}", save_format="h5")
-            tf.saved_model.save(model, f"gs://{gcs_bucket_name}/basic_retrieval_model")
+            tf.saved_model.save(
+                index,
+                f"gs://{gcs_bucket_name}/basic-retrieval-model/{model_version_number}/model.savedmodel/",
+            )
 
         import argparse
         _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
@@ -136,6 +144,7 @@ spec:
         _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
         _parser.add_argument("--test", dest="test_path", type=str, required=True, default=argparse.SUPPRESS)
         _parser.add_argument("--gcs-bucket-name", dest="gcs_bucket_name", type=str, required=True, default=argparse.SUPPRESS)
+        _parser.add_argument("--model-version-number", dest="model_version_number", type=str, required=True, default=argparse.SUPPRESS)
         _parsed_args = vars(_parser.parse_args())
 
         _outputs = build_model(**_parsed_args)
@@ -144,6 +153,7 @@ spec:
     inputs:
       parameters:
       - {name: gcs_bucket_name}
+      - {name: model_version_number}
       artifacts:
       - {name: prepare-dataset-movies, path: /tmp/inputs/movies/data}
       - {name: prepare-dataset-test, path: /tmp/inputs/test/data}
@@ -160,9 +170,10 @@ spec:
           {"inputPath": "movies"}, "--unique-user-ids", {"inputPath": "unique_user_ids"},
           "--unique-movie-titles", {"inputPath": "unique_movie_titles"}, "--train",
           {"inputPath": "train"}, "--test", {"inputPath": "test"}, "--gcs-bucket-name",
-          {"inputValue": "gcs_bucket_name"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
+          {"inputValue": "gcs_bucket_name"}, "--model-version-number", {"inputValue":
+          "model_version_number"}], "command": ["sh", "-ec", "program_path=$(mktemp)\nprintf
           \"%s\" \"$0\" > \"$program_path\"\npython3 -u \"$program_path\" \"$@\"\n",
-          "def build_model(\n    movies_path,\n    unique_user_ids_path,\n    unique_movie_titles_path,\n    train_path,\n    test_path,\n    gcs_bucket_name,\n):\n    \"\"\"Function
+          "def build_model(\n    movies_path,\n    unique_user_ids_path,\n    unique_movie_titles_path,\n    train_path,\n    test_path,\n    gcs_bucket_name,\n    model_version_number,\n):\n    \"\"\"Function
           to build model.\"\"\"\n    import pickle\n    from typing import Dict, Text\n\n    import
           tensorflow as tf\n    import tensorflow_recommenders as tfrs\n\n    embedding_dimension
           = 32\n\n    movies = tf.data.Dataset.load(movies_path, compression=\"GZIP\")\n\n    with
@@ -194,7 +205,7 @@ spec:
           and\n    index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)\n    #
           recommends movies out of the entire movies dataset.\n    index.index_from_dataset(\n        tf.data.Dataset.zip(\n            (movies.batch(100),
           movies.batch(100).map(model.movie_model))\n        )\n    )\n\n    # model.save_weights(f\"{model_path}\",
-          save_format=\"h5\")\n    tf.saved_model.save(model, f\"gs://{gcs_bucket_name}/basic_retrieval_model\")\n\nimport
+          save_format=\"h5\")\n    tf.saved_model.save(\n        index,\n        f\"gs://{gcs_bucket_name}/basic-retrieval-model/{model_version_number}/model.savedmodel/\",\n    )\n\nimport
           argparse\n_parser = argparse.ArgumentParser(prog=''Build model'', description=''Function
           to build model.'')\n_parser.add_argument(\"--movies\", dest=\"movies_path\",
           type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-user-ids\",
@@ -202,13 +213,15 @@ spec:
           dest=\"unique_movie_titles_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--train\",
           dest=\"train_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--test\",
           dest=\"test_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--gcs-bucket-name\",
-          dest=\"gcs_bucket_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args
+          dest=\"gcs_bucket_name\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model-version-number\",
+          dest=\"model_version_number\", type=str, required=True, default=argparse.SUPPRESS)\n_parsed_args
           = vars(_parser.parse_args())\n\n_outputs = build_model(**_parsed_args)\n"],
           "image": "eu.gcr.io/kubeflow-bg-experiment/recommender:latest"}}, "inputs":
           [{"name": "movies"}, {"name": "unique_user_ids"}, {"name": "unique_movie_titles"},
           {"name": "train"}, {"name": "test"}, {"name": "gcs_bucket_name", "type":
-          "String"}], "name": "Build model"}', pipelines.kubeflow.org/component_ref: '{}',
-        pipelines.kubeflow.org/arguments.parameters: '{"gcs_bucket_name": "{{inputs.parameters.gcs_bucket_name}}"}',
+          "String"}, {"name": "model_version_number", "type": "String"}], "name":
+          "Build model"}', pipelines.kubeflow.org/component_ref: '{}', pipelines.kubeflow.org/arguments.parameters: '{"gcs_bucket_name":
+          "{{inputs.parameters.gcs_bucket_name}}", "model_version_number": "{{inputs.parameters.model_version_number}}"}',
         pipelines.kubeflow.org/max_cache_staleness: P0D}
   - name: prepare-dataset
     container:
@@ -343,4 +356,5 @@ spec:
   arguments:
     parameters:
     - {name: gcs_bucket_name}
+    - {name: model_version_number}
   serviceAccountName: pipeline-runner

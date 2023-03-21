@@ -75,6 +75,7 @@ def build_model(
     train_path: comp.InputPath(),
     test_path: comp.InputPath(),
     gcs_bucket_name: str,
+    model_version_number: str,
 ) -> None:
     """Function to build model."""
     import pickle
@@ -183,7 +184,7 @@ def build_model(
 
     tf.saved_model.save(
         listwise_model,
-        f"gs://{gcs_bucket_name}/listwise-ranking-model/",
+        f"gs://{gcs_bucket_name}/listwise-ranking-model/{model_version_number}/model.savedmodel/",
     )
     
 build_model_op = kfp.components.create_component_from_func(
@@ -225,7 +226,7 @@ build_model_op = kfp.components.create_component_from_func(
     name="Listwise ranking pipeline",
     description="Listwise ranking pipeline",
 )
-def listwise_ranking_pipeline(gcs_bucket_name):
+def listwise_ranking_pipeline(gcs_bucket_name, model_version_number):
     """Function to run listwise ranking pipeline."""
     prepare_dataset_task = prepare_dataset_op()
     prepare_dataset_task.container.set_image_pull_policy("Always")
@@ -238,6 +239,7 @@ def listwise_ranking_pipeline(gcs_bucket_name):
         train=prepare_dataset_task.outputs["train"],
         test=prepare_dataset_task.outputs["test"],
         gcs_bucket_name=gcs_bucket_name,
+        model_version_number=model_version_number,
     )
     build_model_task.container.set_image_pull_policy("Always")
     build_model_task.set_caching_options(False)
@@ -295,6 +297,7 @@ client.run_pipeline(
     job_name="listwise ranking job",
     params={
         "gcs_bucket_name": f"{os.environ.get('GCS_STORAGE_BUCKET_NAME')}",
+        "model_version_number": f"{os.environ.get('MODEL_VERSION_NUMBER')}",
     },
     pipeline_id=pipeline_id,
     version_id=version.id,

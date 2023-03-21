@@ -6,6 +6,7 @@ inputs:
 - {name: train}
 - {name: test}
 - {name: gcs_bucket_name, type: String}
+- {name: model_version_number, type: String}
 implementation:
   container:
     image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
@@ -23,6 +24,7 @@ implementation:
           train_path,
           test_path,
           gcs_bucket_name,
+          model_version_number,
       ):
           """Function to build model."""
           import pickle
@@ -128,14 +130,10 @@ implementation:
           listwise_model.fit(cached_train, epochs=epochs, verbose=False)
 
           # listwise_model.save_weights(f"{model_path}", save_format="h5")
-          tf.train.export_meta_graph(
-              listwise_model,
-              f"gs://{gcs_bucket_name}/listwise-ranking-model/",
-          )
 
           tf.saved_model.save(
               listwise_model,
-              f"gs://{gcs_bucket_name}/listwise-ranking-model/",
+              f"gs://{gcs_bucket_name}/listwise-ranking-model/{model_version_number}/model.savedmodel/",
           )
 
       import argparse
@@ -145,6 +143,7 @@ implementation:
       _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
       _parser.add_argument("--test", dest="test_path", type=str, required=True, default=argparse.SUPPRESS)
       _parser.add_argument("--gcs-bucket-name", dest="gcs_bucket_name", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--model-version-number", dest="model_version_number", type=str, required=True, default=argparse.SUPPRESS)
       _parsed_args = vars(_parser.parse_args())
 
       _outputs = build_model(**_parsed_args)
@@ -159,3 +158,5 @@ implementation:
     - {inputPath: test}
     - --gcs-bucket-name
     - {inputValue: gcs_bucket_name}
+    - --model-version-number
+    - {inputValue: model_version_number}

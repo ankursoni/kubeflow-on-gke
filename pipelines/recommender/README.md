@@ -90,11 +90,13 @@ pip install kfp --upgrade
 # run the basic retrieval pipeline
 cd retrieval
 GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-storagebucket01" \
+MODEL_VERSION_NUMBER="1" \
   python basic_retrieval.py
 
 # run the listwise ranking pipeline
 cd ../ranking
 GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-storagebucket01" \
+MODEL_VERSION_NUMBER="1" \
   python listwise_ranking.py
 
 

@@ -1,0 +1,21 @@
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: triton-recommender-deployment
+  namespace: seldon
+spec:
+  protocol: v2
+  name: triton-recommender
+  predictors:
+  - name: seldon-graph
+    replicas: 1
+    graph:
+      name: triton-recommender-retrieval
+      modelUri: gcs:kubeflow-prototype-recommender/
+      envSecretRefName: seldon-rclone-secret
+      implementation: TRITON_SERVER
+      children:
+        - name: triton-recommender-ranking
+          modelUri: gcs:kubeflow-prototype-recommender/
+          envSecretRefName: seldon-rclone-secret
+          implementation: TRITON_SERVER

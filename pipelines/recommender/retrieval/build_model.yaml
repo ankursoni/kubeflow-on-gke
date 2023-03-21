@@ -7,6 +7,7 @@ inputs:
 - {name: train}
 - {name: test}
 - {name: gcs_bucket_name, type: String}
+- {name: model_version_number, type: String}
 implementation:
   container:
     image: eu.gcr.io/kubeflow-bg-experiment/recommender:latest
@@ -25,6 +26,7 @@ implementation:
           train_path,
           test_path,
           gcs_bucket_name,
+          model_version_number,
       ):
           """Function to build model."""
           import pickle
@@ -103,7 +105,10 @@ implementation:
           )
 
           # model.save_weights(f"{model_path}", save_format="h5")
-          tf.saved_model.save(model, f"gs://{gcs_bucket_name}/basic_retrieval_model")
+          tf.saved_model.save(
+              index,
+              f"gs://{gcs_bucket_name}/basic-retrieval-model/{model_version_number}/model.savedmodel/",
+          )
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Build model', description='Function to build model.')
@@ -113,6 +118,7 @@ implementation:
       _parser.add_argument("--train", dest="train_path", type=str, required=True, default=argparse.SUPPRESS)
       _parser.add_argument("--test", dest="test_path", type=str, required=True, default=argparse.SUPPRESS)
       _parser.add_argument("--gcs-bucket-name", dest="gcs_bucket_name", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--model-version-number", dest="model_version_number", type=str, required=True, default=argparse.SUPPRESS)
       _parsed_args = vars(_parser.parse_args())
 
       _outputs = build_model(**_parsed_args)
@@ -129,3 +135,5 @@ implementation:
     - {inputPath: test}
     - --gcs-bucket-name
     - {inputValue: gcs_bucket_name}
+    - --model-version-number
+    - {inputValue: model_version_number}
