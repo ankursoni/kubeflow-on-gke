@@ -107,7 +107,7 @@ implementation:
           # model.save_weights(f"{model_path}", save_format="h5")
           tf.saved_model.save(
               index,
-              f"gs://{gcs_bucket_name}/basic-retrieval-model/{model_version_number}/model.savedmodel/",
+              f"gs://{gcs_bucket_name}/triton-recommender-retrieval/{model_version_number}/model.savedmodel/",
           )
 
       import argparse
