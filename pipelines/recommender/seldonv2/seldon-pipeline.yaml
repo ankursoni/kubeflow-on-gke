@@ -3,7 +3,7 @@ apiVersion: mlops.seldon.io/v1alpha1
 kind: Pipeline
 metadata:
   name: chain
-  namespace: seldon
+  namespace: seldon-mesh
 spec:
   steps:
     - name: triton-recommender-retrieval
