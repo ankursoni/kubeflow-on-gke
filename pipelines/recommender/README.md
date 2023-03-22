@@ -74,10 +74,12 @@ helm install seldon-core-v2 seldon-charts/seldon-core-v2-setup --namespace seldo
 helm install seldon-v2-servers seldon-charts/seldon-core-v2-servers --namespace seldon-mesh
 
 # v2 pre-reqs strimzi kafka
-export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-git clone https://github.com/SeldonIO/ansible-k8s-collection
-ansible-playbook playbooks/kafka.yaml
-kubectl create -f cluster.yaml -n kafka
+helm upgrade --install strimzi-kafka-operator \
+  strimzi/strimzi-kafka-operator \
+  --namespace seldon-mesh --create-namespace \
+  --set featureGates='+UseKRaft\,+UseStrimziPodSets'
+
+helm upgrade seldon-core-v2-kafka kafka/strimzi -n seldon-mesh --install
 
 # install seldon gateway running on port 80
 cd pipelines/recommender

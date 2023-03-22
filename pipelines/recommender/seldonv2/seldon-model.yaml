@@ -4,8 +4,8 @@ metadata:
   name: triton-recommender-retrieval
   namespace: seldon-mesh
 spec:
-  storageUri: gcs:kubeflow-protoytpe-recommender/triton-recommender-retrieval
-  secretName: "gcs-bucket"
+  storageUri: gcs:kubeflow-prototype-recommender/triton-recommender-retrieval/
+  secretName: seldon-rclone-secret
   requirements:
   - tensorflow
 ---
@@ -15,7 +15,7 @@ metadata:
   name: triton-recommender-ranking
   namespace: seldon-mesh
 spec:
-  storageUri: gcs:kubeflow-protoytpe-recommender/triton-recommender-ranking
-  secretName: "gcs-bucket"
+  storageUri: gcs:kubeflow-prototype-recommender/triton-recommender-ranking/
+  secretName: seldon-rclone-secret
   requirements:
     - tensorflow
