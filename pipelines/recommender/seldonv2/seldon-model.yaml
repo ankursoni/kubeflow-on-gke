@@ -1,0 +1,21 @@
+apiVersion: mlops.seldon.io/v1alpha1
+kind: Model
+metadata:
+  name: triton-recommender-retrieval
+  namespace: seldon-mesh
+spec:
+  storageUri: gcs:kubeflow-protoytpe-recommender/triton-recommender-retrieval
+  secretName: "gcs-bucket"
+  requirements:
+  - tensorflow
+---
+apiVersion: mlops.seldon.io/v1alpha1
+kind: Model
+metadata:
+  name: triton-recommender-ranking
+  namespace: seldon-mesh
+spec:
+  storageUri: gcs:kubeflow-protoytpe-recommender/triton-recommender-ranking
+  secretName: "gcs-bucket"
+  requirements:
+    - tensorflow

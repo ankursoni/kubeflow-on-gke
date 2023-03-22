@@ -1,0 +1,17 @@
+# https://docs.seldon.io/projects/seldon-core/en/v2/contents/pipelines/index.html
+apiVersion: mlops.seldon.io/v1alpha1
+kind: Pipeline
+metadata:
+  name: chain
+  namespace: seldon
+spec:
+  steps:
+    - name: triton-recommender-retrieval
+    - name: triton-recommender-ranking
+      inputs:
+      - triton-recommender-retrieval
+      tensorMap:
+        triton-recommender-retrieval.outputs.OUTPUT0: INPUT0
+  output:
+    steps:
+    - triton-recommender-ranking

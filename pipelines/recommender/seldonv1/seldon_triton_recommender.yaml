@@ -14,8 +14,10 @@ spec:
       modelUri: gcs:kubeflow-prototype-recommender/
       envSecretRefName: seldon-rclone-secret
       implementation: TRITON_SERVER
-      children:
+      type: MODEL
+      children: 
         - name: triton-recommender-ranking
           modelUri: gcs:kubeflow-prototype-recommender/
           envSecretRefName: seldon-rclone-secret
           implementation: TRITON_SERVER
+          type: MODEL
