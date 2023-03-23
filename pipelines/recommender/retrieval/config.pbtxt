@@ -3,34 +3,6 @@ platform: "tensorflow_savedmodel"
 parameters: {
 key: "TF_SIGNATURE_DEF"
 value: {
-  string_value: "index"
+  string_value: "serving_default"
   }
 }
-input: [
-        {
-            "name": "user_id",
-            "data_type": "TYPE_STRING",
-            "format": "FORMAT_NONE",
-            "dims": [
-                1
-            ],
-            "reshape": {
-                "shape": []
-            },
-            "is_shape_tensor": false,
-            "allow_ragged_batch": false,
-            "optional": false
-        }
-    ],
-output: [
-        {
-            "name": "output_1",
-            "data_type": "TYPE_FP32",
-            "dims": [
-                5,
-                1
-            ],
-            "label_filename": "",
-            "is_shape_tensor": false
-        }
-    ]

@@ -151,6 +151,7 @@ def build_model(
     tf.saved_model.save(
         serving_default,
         f"gs://{gcs_bucket_name}/triton-recommender-retrieval/{model_version_number}/model.savedmodel/",
+        options=tf.saved_model.SaveOptions(namespace_whitelist=["serving_default"]),
     )
 
 
