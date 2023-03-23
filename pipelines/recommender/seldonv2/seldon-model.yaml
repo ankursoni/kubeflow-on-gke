@@ -7,7 +7,7 @@ spec:
   storageUri: gcs:kubeflow-prototype-recommender/triton-recommender-retrieval/
   secretName: seldon-rclone-secret
   requirements:
-  - tensorflow
+    - tensorflow
 ---
 apiVersion: mlops.seldon.io/v1alpha1
 kind: Model

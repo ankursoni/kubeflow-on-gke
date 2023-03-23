@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: basic-retrieval-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-23T17:07:16.472482',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-24T09:17:44.071386',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Basic retrieval pipeline",
       "inputs": [{"name": "gcs_bucket_name"}, {"name": "model_version_number"}], "name":
       "Basic retrieval pipeline"}'}

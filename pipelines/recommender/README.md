@@ -28,7 +28,7 @@ gcloud compute firewall-rules update gke-kubeflow-prototype-gke01-74e391f2-maste
 
 # install istio
 helm repo add istio https://istio-release.storage.googleapis.com/charts
-helm repo update
+helm repo update istio
 
 kubectl create namespace istio-system
 helm upgrade -i istio-base istio/base -n istio-system
@@ -67,13 +67,15 @@ helm status istio-ingress -n istio-ingress
 helm repo add seldon-charts https://seldonio.github.io/helm-charts
 helm repo update seldon-charts
 
-helm install seldon-core-v2-crds seldon-charts/seldon-core-v2-crds
+helm upgrade --install seldon-core-v2-crds seldon-charts/seldon-core-v2-crds
 
 kubectl create namespace seldon-mesh
-helm install seldon-core-v2 seldon-charts/seldon-core-v2-setup --namespace seldon-mesh
-helm install seldon-v2-servers seldon-charts/seldon-core-v2-servers --namespace seldon-mesh
+helm upgrade --install seldon-core-v2 seldon-charts/seldon-core-v2-setup --namespace seldon-mesh
+helm upgrade --install seldon-v2-servers seldon-charts/seldon-core-v2-servers --namespace seldon-mesh
 
 # strimzi kafka
+helm repo add strimzi https://strimzi.io/charts/
+helm repo update strimzi
 helm upgrade --install strimzi-kafka-operator \
   strimzi/strimzi-kafka-operator \
   --namespace seldon-mesh --create-namespace \
@@ -81,15 +83,16 @@ helm upgrade --install strimzi-kafka-operator \
 
 # seldon kafka cluster
 git clone git@github.com:SeldonIO/seldon-core.git
+cd seldon-core
 git checkout v2
-helm upgrade seldon-core-v2-kafka kafka/strimzi -n seldon-mesh --install
+helm upgrade --install seldon-core-v2-kafka kafka/strimzi --namespace seldon-mesh
 
-# install seldon gateway running on port 80
-cd pipelines/recommender
-kubectl apply -f seldon_gateway.yaml
-
-# run simple example on seldon
-kubectl apply -f seldon_simple_example.yaml
+# apply seldon manifests
+cd ../seldonv2
+kubectl apply -f secret.yaml
+kubectl apply -f seldon-configmap.yaml
+kubectl apply -f seldon-model.yaml
+kubectl apply -f seldon-pipeline.yaml
 ```
 
 
@@ -118,13 +121,13 @@ pip install kfp --upgrade
 
 # run the basic retrieval pipeline
 cd retrieval
-GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-storagebucket01" \
+GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-recommender" \
 MODEL_VERSION_NUMBER="1" \
   python basic_retrieval.py
 
 # run the listwise ranking pipeline
 cd ../ranking
-GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-storagebucket01" \
+GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-recommender" \
 MODEL_VERSION_NUMBER="1" \
   python listwise_ranking.py
 
