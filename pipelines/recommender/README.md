@@ -63,7 +63,7 @@ helm status istio-ingress -n istio-ingress
 # kubectl create namespace seldon
 # kubectl label namespace seldon serving.kubeflow.org/inferenceservice=enabled
 
-# v2
+# v2 seldon
 helm repo add seldon-charts https://seldonio.github.io/helm-charts
 helm repo update seldon-charts
 
@@ -73,12 +73,15 @@ kubectl create namespace seldon-mesh
 helm install seldon-core-v2 seldon-charts/seldon-core-v2-setup --namespace seldon-mesh
 helm install seldon-v2-servers seldon-charts/seldon-core-v2-servers --namespace seldon-mesh
 
-# v2 pre-reqs strimzi kafka
+# strimzi kafka
 helm upgrade --install strimzi-kafka-operator \
   strimzi/strimzi-kafka-operator \
   --namespace seldon-mesh --create-namespace \
   --set featureGates='+UseKRaft\,+UseStrimziPodSets'
 
+# seldon kafka cluster
+git clone git@github.com:SeldonIO/seldon-core.git
+git checkout v2
 helm upgrade seldon-core-v2-kafka kafka/strimzi -n seldon-mesh --install
 
 # install seldon gateway running on port 80
