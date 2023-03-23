@@ -1,0 +1,22 @@
+name: "triton-recommender-retrieval"
+platform: "tensorflow_savedmodel"
+max_batch_size: 0
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT32
+    dims: [ 3 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 3 ]
+  }
+]
