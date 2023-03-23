@@ -1,8 +1,0 @@
-apiVersion: mlops.seldon.io/v1alpha1
-kind: Server
-metadata:
-  name: tfserver
-  namespace: seldon-mesh
-spec:
-  serverConfig: tfserver-config
-  replicas: 1
