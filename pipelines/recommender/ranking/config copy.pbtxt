@@ -1,0 +1,22 @@
+name: "triton-recommender-ranking"
+platform: "tensorflow_savedmodel"
+max_batch_size: 0
+input [
+  {
+    name: "userId"
+    data_type: TYPE_INT32
+    dims: [ 1, 1 ]
+  },
+  {
+    name: "movieIds"
+    data_type: TYPE_INT32
+    dims: [ 1, -1, 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 1, -1 ]
+  }
+]

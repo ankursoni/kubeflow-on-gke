@@ -139,9 +139,9 @@ def build_model(
     model.evaluate(cached_test, return_dict=True)
 
     # Create a model that takes in raw query features, and
-    index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)
+    serving_default = tfrs.layers.factorized_top_k.BruteForce(model.user_model)
     # recommends movies out of the entire movies dataset.
-    index.index_from_dataset(
+    serving_default.index_from_dataset(
         tf.data.Dataset.zip(
             (movies.batch(100), movies.batch(100).map(model.movie_model))
         )
@@ -149,7 +149,7 @@ def build_model(
 
     # model.save_weights(f"{model_path}", save_format="h5")
     tf.saved_model.save(
-        index,
+        serving_default,
         f"gs://{gcs_bucket_name}/triton-recommender-retrieval/{model_version_number}/model.savedmodel/",
     )
 
