@@ -147,13 +147,14 @@ def build_model(
         )
     )
 
+    tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY
+
     # model.save_weights(f"{model_path}", save_format="h5")
     tf.saved_model.save(
         serving_default,
         f"gs://{gcs_bucket_name}/triton-recommender-retrieval/{model_version_number}/model.savedmodel/",
         options=tf.saved_model.SaveOptions(namespace_whitelist=["serving_default"]),
     )
-
 
 build_model_op = kfp.components.create_component_from_func(
     build_model,

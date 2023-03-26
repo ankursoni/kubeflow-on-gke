@@ -104,6 +104,8 @@ implementation:
               )
           )
 
+          tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY
+
           # model.save_weights(f"{model_path}", save_format="h5")
           tf.saved_model.save(
               serving_default,

@@ -1,8 +1,8 @@
 name: "triton-recommender-retrieval"
 platform: "tensorflow_savedmodel"  
 parameters: {
-key: "TF_SIGNATURE_DEF"
-value: {
-  string_value: "serving_default"
-  }
+    key: "TF_SIGNATURE_DEF"
+    value: {
+    string_value: "serving_default"
+    }
 }

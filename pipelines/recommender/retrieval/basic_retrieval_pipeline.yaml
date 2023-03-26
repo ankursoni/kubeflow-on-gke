@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: basic-retrieval-pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-23T22:43:25.237647',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.19, pipelines.kubeflow.org/pipeline_compilation_time: '2023-03-23T23:33:57.492659',
     pipelines.kubeflow.org/pipeline_spec: '{"description": "Basic retrieval pipeline",
       "inputs": [{"name": "gcs_bucket_name"}, {"name": "model_version_number"}], "name":
       "Basic retrieval pipeline"}'}
@@ -130,6 +130,8 @@ spec:
                 )
             )
 
+            tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY
+
             # model.save_weights(f"{model_path}", save_format="h5")
             tf.saved_model.save(
                 serving_default,
@@ -205,8 +207,8 @@ spec:
           return_dict=True)\n\n    # Create a model that takes in raw query features,
           and\n    serving_default = tfrs.layers.factorized_top_k.BruteForce(model.user_model)\n    #
           recommends movies out of the entire movies dataset.\n    serving_default.index_from_dataset(\n        tf.data.Dataset.zip(\n            (movies.batch(100),
-          movies.batch(100).map(model.movie_model))\n        )\n    )\n\n    # model.save_weights(f\"{model_path}\",
-          save_format=\"h5\")\n    tf.saved_model.save(\n        serving_default,\n        f\"gs://{gcs_bucket_name}/triton-recommender-retrieval/{model_version_number}/model.savedmodel/\",\n        options=tf.saved_model.SaveOptions(namespace_whitelist=[\"serving_default\"]),\n    )\n\nimport
+          movies.batch(100).map(model.movie_model))\n        )\n    )\n\n    tf.saved_model.DEFAULT_SERVING_SIGNATURE_DEF_KEY\n\n    #
+          model.save_weights(f\"{model_path}\", save_format=\"h5\")\n    tf.saved_model.save(\n        serving_default,\n        f\"gs://{gcs_bucket_name}/triton-recommender-retrieval/{model_version_number}/model.savedmodel/\",\n        options=tf.saved_model.SaveOptions(namespace_whitelist=[\"serving_default\"]),\n    )\n\nimport
           argparse\n_parser = argparse.ArgumentParser(prog=''Build model'', description=''Function
           to build model.'')\n_parser.add_argument(\"--movies\", dest=\"movies_path\",
           type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--unique-user-ids\",
