@@ -8,9 +8,10 @@ spec:
     - name: triton-recommender-retrieval
     - name: triton-recommender-ranking
       inputs:
-      - triton-recommender-retrieval
-      tensorMap: {}
-       # triton-recommender-retrieval.outputs.OUTPUT0: INPUT0
+      - triton-recommender-retrieval.inputs.INPUT0
+      - triton-recommender-retrieval.outputs.OUTPUT0
+      tensorMap: 
+        triton-recommender-retrieval.outputs.OUTPUT0: INPUT1 #maps the outfrom from retrieval to the input for ranking
   output:
     steps:
     - triton-recommender-ranking

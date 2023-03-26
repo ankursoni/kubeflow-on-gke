@@ -2,6 +2,7 @@ google-cloud-storage~=2.7.0
 pandas~=1.5.3
 numpy~=1.23.2
 tensorflow~=2.11.0
+scann~=1.2.9
 tensorflow-ranking~=0.5.2
 tensorflow-recommenders~=0.7.3
 tensorflow-datasets~=4.8.3

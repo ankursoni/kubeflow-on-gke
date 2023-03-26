@@ -66,12 +66,12 @@ implementation:
           test = shuffled.skip(80_000).take(20_000)
 
           # We sample 50 lists for each user for the training data. For each list we
-          # sample 5 movies from the movies the user rated.
+          # sample 10 movies from the movies the user rated.
           train = tfrs.examples.movielens.sample_listwise(
-              train, num_list_per_user=50, num_examples_per_list=5, seed=42
+              train, num_list_per_user=50, num_examples_per_list=10, seed=42
           )
           test = tfrs.examples.movielens.sample_listwise(
-              test, num_list_per_user=1, num_examples_per_list=5, seed=42
+              test, num_list_per_user=1, num_examples_per_list=10, seed=42
           )
 
           train.save(train_path, compression="GZIP")

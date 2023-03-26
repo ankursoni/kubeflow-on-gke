@@ -130,10 +130,4 @@ cd ../ranking
 GCS_STORAGE_BUCKET_NAME="kubeflow-prototype-recommender" \
 MODEL_VERSION_NUMBER="1" \
   python listwise_ranking.py
-
-
-# after model output is saved to gcs bucket then,
-# run listwise ranking model serve on seldon
-cd ..
-kubectl apply -f seldon_listwise_ranking_model_serve.yaml
 ```
